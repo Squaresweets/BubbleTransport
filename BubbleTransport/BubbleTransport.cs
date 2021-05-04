@@ -8,27 +8,39 @@ using IngameDebugConsole;
 
 public class BubbleTransport : Mirror.Transport
 {
+    static BubbleTransport instance;
+
     [DllImport("__Internal")]
     private static extern void _InitGameCenter();
 
     /// <summary>
-    /// This is one of the main functions you should worry about, you should call it when you want to open the matchmaking UI
-    /// Do not try to start a match by using ServerStart() or ClientConnect(), due to the nature of the randomness in matchmaking this will not work
-    /// Instead when gamecenter finds a match it will add all of the clients and call those functions when needed
+    /// <para/>This is one of the main functions you should worry about, you should call it when you want to open the matchmaking UI
+    /// <para/>Do not try to start a match by using ServerStart() or ClientConnect(), due to the nature of the randomness in matchmaking this will not work
+    /// <para/>Instead when gamecenter finds a match it will add all of the clients and call those functions when needed
     /// </summary>
     [DllImport("__Internal")]
     private static extern void FindMatch();
 
     [DllImport("__Internal")]
-    private static extern void _SendMessageToAll(Byte[] data, int offset, int count);
+    private static extern void SendMessageToServer(Byte[] data, int offset, int count);
 
     [DllImport("__Internal")]
     private static extern void RegisterClientDataRecieveCallback(OnClientDidDataRecievedDelegate OnClientDidDataRecieved);
 
     [DllImport("__Internal")]
     private static extern void RegisterServerDataRecieveCallback(OnServerDidDataRecievedDelegate OnServerDidDataRecieved);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterOnServerConnectedCallback(OnServerConnectedDelegate onServerConnected);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterOnServerStartCallback(OnServerStartDelegate onServerStart);
+
+
+    public Mirror.NetworkManager networkManager;
+
+    //TODO:
     /*
-    TODO:
     - activeTransport
         -The current transport used by Mirror
     - Available
@@ -108,16 +120,14 @@ public class BubbleTransport : Mirror.Transport
     public override void ClientSend(int channelId, ArraySegment<byte> segment)
     {
         if(channelId != 0) { Debug.LogError("only channel 0 is supported"); return; }
-        Byte[] data = segment.Array;
-        _SendMessageToAll(data, segment.Offset, segment.Count);
+        SendMessageToServer(segment.Array, segment.Offset, segment.Count);
     }
     
     public override int GetMaxPacketSize(int channelId = 0) => 16384;
 
     public override bool ServerActive()
     {
-        return true;
-        //throw new NotImplementedException();
+        throw new NotImplementedException();
     }
 
     public override bool ServerDisconnect(int connectionId)
@@ -137,7 +147,7 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ServerStop()
     {
-    
+        throw new NotImplementedException();
     }
 
     public override Uri ServerUri()
@@ -153,11 +163,11 @@ public class BubbleTransport : Mirror.Transport
         
     delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count);
     [AOT.MonoPInvokeCallback(typeof(OnClientDidDataRecievedDelegate))]
-    private void OnClientDidDataRecieved(IntPtr data, int offset, int count)
+    static void OnClientDidDataRecieved(IntPtr data, int offset, int count)
     {
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
-        OnClientDataReceived(new ArraySegment<byte>(_data, offset, count), 0);
+        instance.OnClientDataReceived.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
 
         //Test
         print(System.Text.Encoding.ASCII.GetString(_data));
@@ -179,27 +189,46 @@ public class BubbleTransport : Mirror.Transport
     public void OnServerConnectedCallback(int connId)
     {
         print(connId);
-        //OnServerConnected(connId);
+        OnServerConnected.Invoke(connId);
+    }
+
+    delegate void OnServerStartDelegate();
+    [AOT.MonoPInvokeCallback(typeof(OnServerStartDelegate))]
+    public void OnServerStartCallback()
+    {
+        networkManager.StartServer();
     }
 
     //Test
     void SendMessageToAll(string message)
     {
-        OnServerConnected.Invoke(int.Parse(message));
-        //Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
-        //_SendMessageToAll(data, 65, data.Length);
-    }
-
-    public void FindMatch()
-    {
-        _FindMatch();
+        Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
+        SendMessageToServer(data, 65, data.Length);
     }
 
     private void Awake()
     {
+        if (networkManager == null)
+        {
+            try
+            {
+                networkManager = GetComponent<Mirror.NetworkManager>();
+            }
+            catch
+            {
+                Debug.LogError("Nework Manager could not be found");
+            }
+        }
+
+        if (instance == null)
+            instance = this;
+                
+
         DebugLogConsole.AddCommand<string>("msg", "Sends the message", SendMessageToAll);
         RegisterClientDataRecieveCallback(OnClientDidDataRecieved);
-        
+        RegisterOnServerConnectedCallback(OnServerConnectedCallback);
+        RegisterOnServerStartCallback(OnServerStartCallback);
+
         //OnServerConnected = (connectionId) => OnServerConnected.Invoke(connectionId);
         _InitGameCenter();
     }

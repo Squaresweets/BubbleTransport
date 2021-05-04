@@ -184,7 +184,6 @@ static GCHelper *sharedHelper = nil;
 
 // A peer-to-peer match has been found, the game should start
 - (void)matchmakerViewController:(GKMatchmakerViewController *)viewController didFindMatch:(GKMatch *)theMatch {
-    [presentingViewController dismissViewControllerAnimated:YES completion:nil];
     self.match = theMatch;
     match.delegate = self;
     if (!matchStarted && match.expectedPlayerCount == 0) {
@@ -198,7 +197,6 @@ static GCHelper *sharedHelper = nil;
 // The match received data sent from the player.
 - (void)match:(GKMatch *)theMatch didReceiveData:(NSData *)data fromRemotePlayer:(GKPlayer *)playerID {
     if (match != theMatch) return;
-    NSLog(@"RECEIVED DATA!!!!! IOJOASDOAS{UD OSIAJD:");
     [self.delegate match:theMatch didReceiveData:data fromRemotePlayer:playerID];
 }
 - (void)match:(GKMatch *)theMatch player:(GKPlayer *)player didChangeConnectionState:(GKPlayerConnectionState)state {
