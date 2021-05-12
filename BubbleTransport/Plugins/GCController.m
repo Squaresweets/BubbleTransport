@@ -49,8 +49,7 @@ static BOOL* isServer = NULL;
 +(void)sendDataToPlayer:(NSData *)data toPlayer:(int)playerID
 {
     NSError *error;
-    GKPlayer* player = [[GCHelper sharedInstance].playersDict objectForKey:[NSString stringWithFormat:@"%d", playerID]];
-    BOOL success = [[GCHelper sharedInstance].match sendData:data toPlayers:[NSArray arrayWithObject:player] dataMode:GKMatchSendDataReliable error:&error];
+    BOOL success = [[GCHelper sharedInstance].match sendData:data toPlayers:[NSArray arrayWithObject:[GCHelper sharedInstance].players[playerID]]dataMode:GKMatchSendDataReliable error:&error];
     if(!success)
     {
         NSLog(@"Error sending message");
@@ -73,42 +72,28 @@ char* convertNSStringToCString(const NSString* nsString)
     return cString;
 }
 
-void(^HostingPlayerChosen)(GKPlayer *) = ^(GKPlayer *player)
-{
-    if(player == nil)
-    {
-        [[GCHelper sharedInstance].match chooseBestHostingPlayerWithCompletionHandler:HostingPlayerChosen];
-        return;
-    }
-    [[GCHelper sharedInstance].presentingViewController dismissViewControllerAnimated:YES completion:nil];
+#pragma mark GCHelperDelegate
+- (void)matchStarted{
     
-    NSLog(@"chosen player is: %@", player.alias);
-    if(player == GKLocalPlayer.localPlayer)
+    [[GCHelper sharedInstance].presentingViewController dismissViewControllerAnimated:YES completion:nil];
+    if([GKLocalPlayer.localPlayer.alias  isEqual: @"Squaresweets"])
+    //if([GCHelper sharedInstance].players[0] == GKLocalPlayer.localPlayer)
     {
         NSLog(@"SERVER WOOO");
-        isServer = true;
+        isServer = YES;
         ServerStart();
-        for (GKPlayer *_player in [GCHelper sharedInstance].playersDict) {
-            ServerConnected(_player.playerID);
-        }
-            
-        for(id key in [GCHelper sharedInstance].playersDict)
-        {
-            ServerConnected(key);
-        }
+        
+        for(int i = 1; i <= [GCHelper sharedInstance].players.count; i++)
+            ServerConnected(i);
     }
     else
     {
         NSLog(@"CLIENT WOOO");
-        isServer = false;
-        serverPlayer = player;
+        isServer = NO;
+        serverPlayer = [GCHelper sharedInstance].players[0];
         ClientStart();
     }
-};
-
-#pragma mark GCHelperDelegate
-- (void)matchStarted{
-    [[GCHelper sharedInstance].match chooseBestHostingPlayerWithCompletionHandler:HostingPlayerChosen];
+    
     
     NSLog(@"Match Started");
 }
@@ -117,7 +102,7 @@ void(^HostingPlayerChosen)(GKPlayer *) = ^(GKPlayer *player)
     NSLog(@"Match ended");
 }
 
-- (void)match:(GKMatch *)match didReceiveData:(NSData *)data fromRemotePlayer:(GKPlayer *)playerID {
+- (void)match:(GKMatch *)match didReceiveData:(NSData *)data fromRemotePlayer:(GKPlayer *)player {
     NSUInteger len = [data length];
     
     Byte offset;
@@ -126,8 +111,21 @@ void(^HostingPlayerChosen)(GKPlayer *) = ^(GKPlayer *player)
     Byte byteData[len-1];
     [data getBytes:byteData range:NSMakeRange(1,len-1)];
     intptr_t i = byteData;
+    
     if(isServer)
-        ServerRecievedData(playerID.playerID, i, (int)offset, (int)len-1);
+    {
+        NSString* s = player.playerID;
+        int connID = -1;
+        for(int j = 1; j <= [GCHelper sharedInstance].players.count; i++)
+        {
+            if(s == [GCHelper sharedInstance].players[i])
+                connID = j;
+        }
+        if(connID == -1)
+            NSLog(@"ERROR, data returned cannot be linked to a player");
+        
+        ServerRecievedData(connID, i, (int)offset, (int)len-1);
+    }
     else
         ClientRecievedData(i, (int)offset, (int)len-1);
 }

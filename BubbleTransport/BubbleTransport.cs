@@ -150,6 +150,7 @@ public class BubbleTransport : Mirror.Transport
     public override void ServerSend(int connectionId, int channelId, ArraySegment<byte> segment)
     {
         print("ChannelID: " + channelId);
+        print("ConnectionID: " + connectionId);
         if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
         SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count);
     }

@@ -14,7 +14,7 @@ extern UIViewController *UnityGetGLViewController();
 @synthesize match;
 @synthesize delegate;
 
-@synthesize playersDict;
+@synthesize players;
 
 @synthesize pendingInvite;
 @synthesize pendingPlayersToInvite;
@@ -86,11 +86,8 @@ static GCHelper *sharedHelper = nil;
         } else {
             
             // Populate players dict
-            self.playersDict = [NSMutableDictionary dictionaryWithCapacity:players.count];
-            for (GKPlayer *player in players) {
-                NSLog(@"Found player: %@", player.alias);
-                [playersDict setObject:player forKey:player.playerID];
-            }
+            self.players = players;
+            NSLog(@"Player count: %lu", players.count);
             
             // Notify delegate match can begin
             [self.delegate matchStarted];
