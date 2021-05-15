@@ -126,7 +126,7 @@ public class BubbleTransport : Mirror.Transport
     public override void ClientSend(int channelId, ArraySegment<byte> segment)
     {
         print("ChannelID: " + channelId);
-        if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
+        //if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
         SendMessageToServer(segment.Array, segment.Offset, segment.Count);
     }
     
@@ -151,7 +151,7 @@ public class BubbleTransport : Mirror.Transport
     {
         print("ChannelID: " + channelId);
         print("ConnectionID: " + connectionId);
-        if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
+        //if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
         SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count);
     }
 
@@ -252,6 +252,7 @@ public class BubbleTransport : Mirror.Transport
 
         DebugLogConsole.AddCommand<string>("msg", "Sends the message", SendMessageToServer);
         RegisterClientDataRecieveCallback(OnClientDidDataRecieved);
+        RegisterServerDataRecieveCallback(OnServerDidDataRecieved);
         RegisterOnServerConnectedCallback(OnServerConnectedCallback);
         RegisterOnServerStartCallback(OnServerStartCallback);
         RegisterOnClientStartCallback(OnClientStartCallback);

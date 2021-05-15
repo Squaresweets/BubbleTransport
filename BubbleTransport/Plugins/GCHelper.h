@@ -31,7 +31,7 @@
 @property (retain) UIViewController *presentingViewController;
 @property (retain) GKMatch *match;
 @property (retain) id <GCHelperDelegate> delegate;
-@property (retain) NSArray *players;
+@property (retain) NSMutableArray *players;
 
 @property (retain) GKInvite *pendingInvite;
 @property (retain) NSArray *pendingPlayersToInvite;

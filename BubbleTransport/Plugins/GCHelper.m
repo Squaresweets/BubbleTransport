@@ -77,7 +77,7 @@ static GCHelper *sharedHelper = nil;
     
     NSLog(@"Looking up %lu players...", (unsigned long)match.players.count);
     NSArray *playerIds = [match.players valueForKey:@"playerID"];
-    [GKPlayer loadPlayersForIdentifiers:playerIds withCompletionHandler:^(NSArray *players, NSError *error) {
+    [GKPlayer loadPlayersForIdentifiers:playerIds withCompletionHandler:^(NSArray *_players, NSError *error) {
        
         if (error != nil) {
             NSLog(@"Error retrieving player info: %@", error.localizedDescription);
@@ -86,8 +86,19 @@ static GCHelper *sharedHelper = nil;
         } else {
             
             // Populate players dict
-            self.players = players;
-            NSLog(@"Player count: %lu", players.count);
+            NSMutableArray* temparray = [[NSMutableArray alloc] initWithCapacity:_players.count+1];
+            [temparray addObject:GKLocalPlayer.localPlayer];
+            [temparray addObjectsFromArray:_players];
+            
+            [temparray sortUsingComparator:^NSComparisonResult(id a, id b)
+            {
+                GKPlayer * pa = (GKPlayer *)a;
+                GKPlayer * pb = (GKPlayer *)b;
+                return [[pa.playerID substringFromIndex:2] longLongValue] < [[pb.playerID substringFromIndex:2] longLongValue];
+            }];
+            self.players = [[NSMutableArray alloc] initWithCapacity:_players.count+1];
+            [self.players addObjectsFromArray:temparray];
+            
             
             // Notify delegate match can begin
             [self.delegate matchStarted];
@@ -95,6 +106,14 @@ static GCHelper *sharedHelper = nil;
         }
     }];
     
+}
+
+int PlayerSort(const void *Element1, const void *Element2)
+{
+    const GKPlayer *p1 = (__bridge const GKPlayer*)Element1;
+    const GKPlayer *p2 = (__bridge const GKPlayer*)Element2;
+    
+    return [[p1.playerID substringFromIndex:2] longLongValue] > [[p2.playerID substringFromIndex:2] longLongValue];
 }
 
 #pragma mark User functions

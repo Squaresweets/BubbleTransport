@@ -76,14 +76,15 @@ char* convertNSStringToCString(const NSString* nsString)
 - (void)matchStarted{
     
     [[GCHelper sharedInstance].presentingViewController dismissViewControllerAnimated:YES completion:nil];
-    if([GKLocalPlayer.localPlayer.alias  isEqual: @"Squaresweets"])
-    //if([GCHelper sharedInstance].players[0] == GKLocalPlayer.localPlayer)
+    //if([GKLocalPlayer.localPlayer.alias  isEqual: @"Squaresweets"])
+    if([GCHelper sharedInstance].players[0] == GKLocalPlayer.localPlayer)
     {
         NSLog(@"SERVER WOOO");
         isServer = YES;
         ServerStart();
         
-        for(int i = 1; i <= [GCHelper sharedInstance].players.count; i++)
+        NSLog(@"Num players: %lu", (unsigned long)[GCHelper sharedInstance].players.count);
+        for(int i = 1; i < [GCHelper sharedInstance].players.count; i++)
             ServerConnected(i);
     }
     else
@@ -111,14 +112,13 @@ char* convertNSStringToCString(const NSString* nsString)
     Byte byteData[len-1];
     [data getBytes:byteData range:NSMakeRange(1,len-1)];
     intptr_t i = byteData;
-    
+    NSLog(@"Player name: %@", player.alias);
     if(isServer)
     {
-        NSString* s = player.playerID;
         int connID = -1;
-        for(int j = 1; j <= [GCHelper sharedInstance].players.count; i++)
+        for(int j = 1; j < [GCHelper sharedInstance].players.count; j++)
         {
-            if(s == [GCHelper sharedInstance].players[i])
+            if([player.playerID isEqual: ((GKPlayer *)[GCHelper sharedInstance].players[j]).playerID])
                 connID = j;
         }
         if(connID == -1)
@@ -127,7 +127,9 @@ char* convertNSStringToCString(const NSString* nsString)
         ServerRecievedData(connID, i, (int)offset, (int)len-1);
     }
     else
-        ClientRecievedData(i, (int)offset, (int)len-1);
+    {
+            ClientRecievedData(i, (int)offset, (int)len-1);
+    }
 }
 
 @end
