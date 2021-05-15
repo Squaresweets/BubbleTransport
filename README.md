@@ -1,56 +1,16 @@
+![BubbleTransportLogo](https://matthewcollier.co.uk/BubbleTransportLongLogo.png)
 [<img src="https://img.shields.io/discord/672474661388288021" /></a>](https://discord.gg/6hswr9j)
 [<img src="https://img.shields.io/twitter/follow/SqSweetsGames?style=social" /></a>](https://twitter.com/SqSweetsGames)
 [<img src="https://forthebadge.com/images/badges/gluten-free.svg" height=20/></a>](https://forthebadge.com)
 
-    TODO:
-    - activeTransport
-        -The current transport used by Mirror
-    - Available
-        -Easy stuff, tho it may take a callback to get whether gamecenter is supported
+# Bubble Transport
 
-    -GetMaxBackSize/GetMaxPacketSize
-        -Speek for themselves
+Bubble transport is a transport for [Mirror Networking](https://github.com/vis2k/Mirror) that uses [Game Center Matchmaking](https://developer.apple.com/game-center/) to connect players and transfer data
 
-    ~~~~~ C A L L B A C K S ~~~~~
+Bubble is still in development and will be releasing soon! ᵔᴥᵔ
 
-    -OnClientConnected
-        -For clients when they conenct to the server, called when you start the game as a client
-    -OnClientDataReceived
-        -Self explanatory, shouldn't be hard to implement
-    -OnClientDisconnected
-        -Should be possible with https://developer.apple.com/documentation/gamekit/gkmatchdelegate, or with [self.delegate matchEnded]
-    
-    -OnServerConnected
-        -This may be hard, at the start I will have to call OnServerConnected multiple times depending on the number of people connected
-    -OnServerDataReceived
-        -Not too hard once again
-    -OnServerDisconnected
-        -For when a client disconnects
+## Credits and licence
 
-    -OnClientError / OnServerError
-        -Should also be possible with https://developer.apple.com/documentation/gamekit/gkmatchdelegate, though it may be hard to convert over the error, IDK
+Bubble transport was made by [Matthew Collier](https://matthewcollier.co.uk/) and is 100% free to use in every way!
 
-        
-    ~~~~~ M E T H O D S ~~~~~
-
-    -ClientConnect/ServerStart
-        -These must call the same thing that just opens the matchmaking menu
-    -ClientConnected
-        -Just says if you are connected
-    -ClientDisconnect
-        -Disconnects the client
-    -ClientSend
-        -SEND THE DATA TO THE SERVER WOOOOOOOO
-    
-    -ServerActive
-        -Just says if the server is active
-    -ServerDisconnect
-        -Used to kick out a client
-    -ServerGetClientAddress
-        -D U N N O  W H A T  T O  D O  F O R  T H I S  O N E ! ! ! 
-    -ServerSend
-        -SEND THE DATA TO THE SPECIFIC CLIENT WOOOOOOOO
-    -ServerStart/ServerStop
-        -Speak for themselves
-    -ServerUri
-        -D U N N O  W H A T  T O  D O  F O R  T H I S  O N E ! ! ! 
+But if it was useful to you, consider checking out [my game](https://matthewcollier.co.uk/in-the-slimelight/) that I made it for!
