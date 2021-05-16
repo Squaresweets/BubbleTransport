@@ -37,19 +37,19 @@ static BOOL* isServer = NULL;
 }
 
 
-+(void)sendDataToServer:(NSData *)data
++(void)sendDataToServer:(NSData *)data datamode:(int)channel
 {
     NSError *error;
-    BOOL success = [[GCHelper sharedInstance].match sendData:data toPlayers:[NSArray arrayWithObject:serverPlayer] dataMode:GKMatchSendDataReliable error:&error];
+    BOOL success = [[GCHelper sharedInstance].match sendData:data toPlayers:[NSArray arrayWithObject:serverPlayer] dataMode:channel == 0 ? GKMatchSendDataReliable : GKMatchSendDataUnreliable error:&error];
     if(!success)
     {
        NSLog(@"Error sending message");
     }
 }
-+(void)sendDataToPlayer:(NSData *)data toPlayer:(int)playerID
++(void)sendDataToPlayer:(NSData *)data toPlayer:(int)playerID datamode:(int)channel
 {
     NSError *error;
-    BOOL success = [[GCHelper sharedInstance].match sendData:data toPlayers:[NSArray arrayWithObject:[GCHelper sharedInstance].players[playerID]]dataMode:GKMatchSendDataReliable error:&error];
+    BOOL success = [[GCHelper sharedInstance].match sendData:data toPlayers:[NSArray arrayWithObject:[GCHelper sharedInstance].players[playerID]]dataMode:channel == 0 ? GKMatchSendDataReliable : GKMatchSendDataUnreliable error:&error];
     if(!success)
     {
         NSLog(@"Error sending message");
@@ -147,23 +147,23 @@ extern "C"
     {
         [GCController findMatch];
     }
-    void SendMessageToServer(Byte data[], int offset, int count)
+    void SendMessageToServer(Byte data[], int offset, int count, int channel)
     {
         Byte dataoffset[(NSUInteger)count+1];
         dataoffset[0] = (Byte)offset;
         memcpy(dataoffset+1, data, count);
         NSData *dataToSend = [NSData dataWithBytes:dataoffset length:count+1];
         
-        [GCController sendDataToServer:dataToSend];
+        [GCController sendDataToServer:dataToSend datamode:channel];
     }
-    void SendMessageToClient(int clientId, Byte data[], int offset, int count)
+    void SendMessageToClient(int clientId, Byte data[], int offset, int count, int channel)
     {
         Byte dataoffset[(NSUInteger)count+1];
         dataoffset[0] = (Byte)offset;
         memcpy(dataoffset+1, data, count);
         NSData *dataToSend = [NSData dataWithBytes:dataoffset length:count+1];
         
-        [GCController sendDataToPlayer:dataToSend toPlayer:clientId];
+        [GCController sendDataToPlayer:dataToSend toPlayer:clientId datamode:channel];
     }
     typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count);
     void RegisterClientDataRecieveCallback(OnClientDidDataRecievedDelegate callback)

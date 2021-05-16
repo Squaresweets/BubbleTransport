@@ -5,6 +5,7 @@ using UnityEngine;
 using System.Runtime.InteropServices;
 
 using IngameDebugConsole;
+using UnityEngine.Events;
 
 public class BubbleTransport : Mirror.Transport
 {
@@ -22,10 +23,10 @@ public class BubbleTransport : Mirror.Transport
     private static extern void _FindMatch();
 
     [DllImport("__Internal")]
-    private static extern void SendMessageToServer(Byte[] data, int offset, int count);
+    private static extern void SendMessageToServer(Byte[] data, int offset, int count, int channel);
 
     [DllImport("__Internal")]
-    private static extern void SendMessageToClient(int clientId, Byte[] data, int offset, int count);
+    private static extern void SendMessageToClient(int clientId, Byte[] data, int offset, int count, int channel);
 
     [DllImport("__Internal")]
     private static extern void RegisterClientDataRecieveCallback(OnClientDidDataRecievedDelegate OnClientDidDataRecieved);
@@ -41,8 +42,18 @@ public class BubbleTransport : Mirror.Transport
 
     [DllImport("__Internal")]
     private static extern void RegisterOnClientStartCallback(OnClientStartDelegate onClientStart);
+    
+    [Serializable]
+    /// <summary>
+    /// Function definition for a button click event.
+    /// </summary>
+    public class MatchFoundEvent : UnityEvent { }
 
+    // Event delegates triggered on click.
+    [SerializeField]
+    private MatchFoundEvent matchFound = new MatchFoundEvent();
 
+    [HideInInspector]
     public Mirror.NetworkManager networkManager;
 
     //TODO:
@@ -125,9 +136,8 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ClientSend(int channelId, ArraySegment<byte> segment)
     {
-        print("ChannelID: " + channelId);
-        //if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
-        SendMessageToServer(segment.Array, segment.Offset, segment.Count);
+        if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
+        SendMessageToServer(segment.Array, segment.Offset, segment.Count, channelId);
     }
     
     public override int GetMaxPacketSize(int channelId = 0) => 16384;
@@ -149,10 +159,8 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ServerSend(int connectionId, int channelId, ArraySegment<byte> segment)
     {
-        print("ChannelID: " + channelId);
-        print("ConnectionID: " + connectionId);
-        //if (channelId != 0) { Debug.LogError("only channel 0 is supported"); }
-        SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count);
+        if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
+        SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count, channelId);
     }
 
     public override void ServerStop()
@@ -178,10 +186,6 @@ public class BubbleTransport : Mirror.Transport
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
         instance.OnClientDataReceived.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
-
-        //Test
-        print(System.Text.Encoding.ASCII.GetString(_data));
-        print("offset: " + offset);
     }
 
     delegate void OnServerDidDataRecievedDelegate(int connId, IntPtr data, int offset, int count);
@@ -200,7 +204,6 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnServerConnectedDelegate))]
     static void OnServerConnectedCallback(int connId)
     {
-        print(connId);
         instance.OnServerConnected.Invoke(connId);
     }
 
@@ -208,14 +211,14 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnServerStartDelegate))]
     static void OnServerStartCallback()
     {
-        print("SERVER");
+        instance.matchFound.Invoke();
         instance.networkManager.StartHost();
     }
     delegate void OnClientStartDelegate();
     [AOT.MonoPInvokeCallback(typeof(OnClientStartDelegate))]
     static void OnClientStartCallback()
     {
-        print("CLIENT");
+        instance.matchFound.Invoke();
         instance.networkManager.StartClient();
         instance.OnClientConnected.Invoke();
     }
@@ -224,7 +227,7 @@ public class BubbleTransport : Mirror.Transport
     void SendMessageToServer(string message)
     {
         Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
-        SendMessageToServer(data, 65, data.Length);
+        SendMessageToServer(data, 65, data.Length, 0);
     }
 
     public void FindMatch()
@@ -234,16 +237,13 @@ public class BubbleTransport : Mirror.Transport
 
     private void Awake()
     {
-        if (networkManager == null)
+        try
         {
-            try
-            {
-                networkManager = GetComponent<Mirror.NetworkManager>();
-            }
-            catch
-            {
-                Debug.LogError("Nework Manager could not be found");
-            }
+           networkManager = GetComponent<Mirror.NetworkManager>();
+        }
+        catch
+        {
+            Debug.LogError("Nework Manager could not be found");
         }
 
         if (instance == null)
