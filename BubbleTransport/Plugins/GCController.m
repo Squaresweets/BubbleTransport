@@ -18,6 +18,10 @@ typedef void (*OnServerConnectedDelegate)(int connId);
 OnServerConnectedDelegate ServerConnected = NULL;
 typedef void (*OnServerStartDelegate)();
 OnServerStartDelegate ServerStart = NULL;
+typedef void (*OnClientDisconnectedDelegate)();
+OnClientDisconnectedDelegate ClientDisconnected = NULL;
+typedef void (*OnServerDisconnectedDelegate)(int connID);
+OnServerDisconnectedDelegate ServerDisconnected = NULL;
 typedef void (*OnClientStartDelegate)();
 OnClientStartDelegate ClientStart = NULL;
 
@@ -34,6 +38,11 @@ static BOOL* isServer = NULL;
     UIViewController* viewcontroller = (UIViewController*) [UIApplication sharedApplication].delegate;
     [[GCHelper sharedInstance] findMatchWithMinPlayers:2 maxPlayers:4
     viewController:viewcontroller];
+}
++ (void) Shutdown
+{
+    [[GCHelper sharedInstance].match disconnect];
+    [GCHelper sharedInstance].match.delegate = nil;
 }
 
 
@@ -71,12 +80,26 @@ char* convertNSStringToCString(const NSString* nsString)
     
     return cString;
 }
+-(int)getConnID:(GKPlayer *)player
+{
+    int connID = -1;
+    for(int j = 1; j < [GCHelper sharedInstance].players.count; j++)
+    {
+        if([player.playerID isEqual: ((GKPlayer *)[GCHelper sharedInstance].players[j]).playerID])
+        {
+            connID = j;
+            break;
+        }
+    }
+    if(connID == -1)
+        NSLog(@"ERROR, data returned cannot be linked to a player");
+    return connID;
+}
 
 #pragma mark GCHelperDelegate
 - (void)matchStarted{
     
     [[GCHelper sharedInstance].presentingViewController dismissViewControllerAnimated:YES completion:nil];
-    //if([GKLocalPlayer.localPlayer.alias  isEqual: @"Squaresweets"])
     if([GCHelper sharedInstance].players[0] == GKLocalPlayer.localPlayer)
     {
         NSLog(@"SERVER WOOO");
@@ -99,10 +122,14 @@ char* convertNSStringToCString(const NSString* nsString)
     NSLog(@"Match Started");
 }
 
-- (void)matchEnded {    
-    NSLog(@"Match ended");
-}
 
+- (void)playerDisconnected:(GKPlayer *)player
+{
+    if(player == serverPlayer)
+        ClientDisconnected();
+    else if (isServer)
+        ServerDisconnected([self getConnID:player]);
+}
 - (void)match:(GKMatch *)match didReceiveData:(NSData *)data fromRemotePlayer:(GKPlayer *)player {
     NSUInteger len = [data length];
     
@@ -112,23 +139,13 @@ char* convertNSStringToCString(const NSString* nsString)
     Byte byteData[len-1];
     [data getBytes:byteData range:NSMakeRange(1,len-1)];
     intptr_t i = byteData;
-    NSLog(@"Player name: %@", player.alias);
     if(isServer)
     {
-        int connID = -1;
-        for(int j = 1; j < [GCHelper sharedInstance].players.count; j++)
-        {
-            if([player.playerID isEqual: ((GKPlayer *)[GCHelper sharedInstance].players[j]).playerID])
-                connID = j;
-        }
-        if(connID == -1)
-            NSLog(@"ERROR, data returned cannot be linked to a player");
-        
-        ServerRecievedData(connID, i, (int)offset, (int)len-1);
+        ServerRecievedData([self getConnID:player], i, (int)offset, (int)len-1);
     }
     else
     {
-            ClientRecievedData(i, (int)offset, (int)len-1);
+        ClientRecievedData(i, (int)offset, (int)len-1);
     }
 }
 
@@ -146,6 +163,10 @@ extern "C"
     void _FindMatch()
     {
         [GCController findMatch];
+    }
+    void _Shutdown()
+    {
+        [GCController Shutdown];
     }
     void SendMessageToServer(Byte data[], int offset, int count, int channel)
     {
@@ -195,6 +216,22 @@ extern "C"
         if(ClientStart == NULL)
         {
             ClientStart = callback;
+        }
+    }
+    typedef void (*OnServerDisconnectedDelegate)(int connID);
+    void RegisterOnServerDisconnectedCallback(OnServerDisconnectedDelegate callback)
+    {
+        if(ServerDisconnected == NULL)
+        {
+            ServerDisconnected = callback;
+        }
+    }
+    typedef void (*OnClientDisconnectedDelegate)();
+    void RegisterOnClientDisconnectedCallback(OnClientDisconnectedDelegate callback)
+    {
+        if(ClientDisconnected == NULL)
+        {
+            ClientDisconnected = callback;
         }
     }
     typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count);

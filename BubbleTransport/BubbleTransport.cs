@@ -4,23 +4,20 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
 
-using IngameDebugConsole;
 using UnityEngine.Events;
 
 public class BubbleTransport : Mirror.Transport
 {
-    static BubbleTransport instance;
+    public static BubbleTransport instance;
 
     [DllImport("__Internal")]
     private static extern void _InitGameCenter();
 
-    /// <summary>
-    /// <para/>This is one of the main functions you should worry about, you should call it when you want to open the matchmaking UI
-    /// <para/>Do not try to start a match by using ServerStart() or ClientConnect(), due to the nature of the randomness in matchmaking this will not work
-    /// <para/>Instead when gamecenter finds a match it will add all of the clients and call those functions when needed
-    /// </summary>
     [DllImport("__Internal")]
     private static extern void _FindMatch();
+
+    [DllImport("__Internal")]
+    private static extern void _Shutdown();
 
     [DllImport("__Internal")]
     private static extern void SendMessageToServer(Byte[] data, int offset, int count, int channel);
@@ -39,6 +36,12 @@ public class BubbleTransport : Mirror.Transport
 
     [DllImport("__Internal")]
     private static extern void RegisterOnServerStartCallback(OnServerStartDelegate onServerStart);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterOnServerDisconnectedCallback(OnServerDisconnectedDelegate onServerDisconnected);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterOnClientDisconnectedCallback(OnClientDisconnectedDelegate onClientDisconnected);
 
     [DllImport("__Internal")]
     private static extern void RegisterOnClientStartCallback(OnClientStartDelegate onClientStart);
@@ -67,18 +70,10 @@ public class BubbleTransport : Mirror.Transport
         -Speek for themselves
 
     ~~~~~ C A L L B A C K S ~~~~~
-
-    -OnClientConnected
-        -For clients when they conenct to the server, called when you start the game as a client
-    -OnClientDataReceived
-        -Self explanatory, shouldn't be hard to implement
+    
     -OnClientDisconnected
         -Should be possible with https://developer.apple.com/documentation/gamekit/gkmatchdelegate, or with [self.delegate matchEnded]
-    
-    -OnServerConnected
-        -This may be hard, at the start I will have to call OnServerConnected multiple times depending on the number of people connected
-    -OnServerDataReceived
-        -Not too hard once again
+
     -OnServerDisconnected
         -For when a client disconnects
 
@@ -87,31 +82,17 @@ public class BubbleTransport : Mirror.Transport
 
         
     ~~~~~ M E T H O D S ~~~~~
-
-    -ClientConnect/ServerStart
-        -These must call the same thing that just opens the matchmaking menu
+    
     -ClientConnected
         -Just says if you are connected
-    -ClientDisconnect
-        -Disconnects the client
-    -ClientSend
-        -SEND THE DATA TO THE SERVER WOOOOOOOO
     
     -ServerActive
         -Just says if the server is active
     -ServerDisconnect
         -Used to kick out a client
-    -ServerGetClientAddress
-        -D U N N O  W H A T  T O  D O  F O R  T H I S  O N E ! ! ! 
-    -ServerSend
-        -SEND THE DATA TO THE SPECIFIC CLIENT WOOOOOOOO
-    -ServerStart/ServerStop
-        -Speak for themselves
-    -ServerUri
-        -D U N N O  W H A T  T O  D O  F O R  T H I S  O N E ! ! ! 
     */
 
-    #region Transport
+    #region Other
     public override bool Available()
     {
         return Application.platform == RuntimePlatform.IPhonePlayer;
@@ -124,6 +105,15 @@ public class BubbleTransport : Mirror.Transport
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    public override int GetMaxPacketSize(int channelId = 0) => 16384;
+
+    public override void Shutdown()
+    {
+        _Shutdown();
+    }
+    #endregion
+
+    #region Client
     public override bool ClientConnected()
     {
         throw new NotImplementedException();
@@ -131,7 +121,7 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ClientDisconnect()
     {
-        throw new NotImplementedException();
+        _Shutdown();
     }
 
     public override void ClientSend(int channelId, ArraySegment<byte> segment)
@@ -139,9 +129,41 @@ public class BubbleTransport : Mirror.Transport
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
         SendMessageToServer(segment.Array, segment.Offset, segment.Count, channelId);
     }
-    
-    public override int GetMaxPacketSize(int channelId = 0) => 16384;
 
+    public override Uri ServerUri()
+    {
+        Debug.LogWarning("Game Center matchmaking does not provide a serverURI");
+        return null;
+    }
+
+    delegate void OnClientDisconnectedDelegate();
+    [AOT.MonoPInvokeCallback(typeof(OnClientDisconnectedDelegate))]
+    static void ClientDisconnectedCallback()
+    {
+        print("Client disconnected callback");
+        instance.OnClientDisconnected.Invoke();
+    }
+
+    delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count);
+    [AOT.MonoPInvokeCallback(typeof(OnClientDidDataRecievedDelegate))]
+    static void OnClientDidDataRecieved(IntPtr data, int offset, int count)
+    {
+        byte[] _data = new byte[count];
+        Marshal.Copy(data, _data, 0, count);
+        instance.OnClientDataReceived.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
+    }
+
+    delegate void OnClientStartDelegate();
+    [AOT.MonoPInvokeCallback(typeof(OnClientStartDelegate))]
+    static void OnClientStartCallback()
+    {
+        instance.matchFound.Invoke();
+        instance.networkManager.StartClient();
+        instance.OnClientConnected.Invoke();
+    }
+    #endregion
+
+    #region Server
     public override bool ServerActive()
     {
         throw new NotImplementedException();
@@ -149,12 +171,8 @@ public class BubbleTransport : Mirror.Transport
 
     public override bool ServerDisconnect(int connectionId)
     {
-        throw new NotImplementedException();
-    }
-
-    public override string ServerGetClientAddress(int connectionId)
-    {
-        throw new NotImplementedException();
+        //Game center matchmaking does not support kicking a client
+        return false;
     }
 
     public override void ServerSend(int connectionId, int channelId, ArraySegment<byte> segment)
@@ -163,29 +181,18 @@ public class BubbleTransport : Mirror.Transport
         SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count, channelId);
     }
 
-    public override void ServerStop()
+    public override string ServerGetClientAddress(int connectionId)
     {
-        throw new NotImplementedException();
+        Debug.LogWarning("Game Center matchmaking does not provide a connectionID");
+        return null;
     }
 
-    public override Uri ServerUri()
+    delegate void OnServerDisconnectedDelegate(int connID);
+    [AOT.MonoPInvokeCallback(typeof(OnServerDisconnectedDelegate))]
+    static void ServerDisconnectedCallback(int connID)
     {
-        throw new NotImplementedException();
-    }
-
-    public override void Shutdown()
-    {
-        throw new NotImplementedException();
-    }
-    #endregion
-        
-    delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count);
-    [AOT.MonoPInvokeCallback(typeof(OnClientDidDataRecievedDelegate))]
-    static void OnClientDidDataRecieved(IntPtr data, int offset, int count)
-    {
-        byte[] _data = new byte[count];
-        Marshal.Copy(data, _data, 0, count);
-        instance.OnClientDataReceived.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
+        print("Server disconnected callback");
+        instance.OnServerDisconnected.Invoke(connID);
     }
 
     delegate void OnServerDidDataRecievedDelegate(int connId, IntPtr data, int offset, int count);
@@ -214,22 +221,19 @@ public class BubbleTransport : Mirror.Transport
         instance.matchFound.Invoke();
         instance.networkManager.StartHost();
     }
-    delegate void OnClientStartDelegate();
-    [AOT.MonoPInvokeCallback(typeof(OnClientStartDelegate))]
-    static void OnClientStartCallback()
+
+    public override void ServerStop()
     {
-        instance.matchFound.Invoke();
-        instance.networkManager.StartClient();
-        instance.OnClientConnected.Invoke();
+        _Shutdown();
     }
 
-    //Test
-    void SendMessageToServer(string message)
-    {
-        Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
-        SendMessageToServer(data, 65, data.Length, 0);
-    }
+    #endregion
 
+    /// <summary>
+    /// <para/>This is one of the main functions you should worry about, you should call it when you want to open the matchmaking UI
+    /// <para/>Do not try to start a match by using ServerStart() or ClientConnect(), due to the nature of the randomness in matchmaking this will not work
+    /// <para/>Instead when gamecenter finds a match it will add all of the clients and call those functions when needed
+    /// </summary>
     public void FindMatch()
     {
         _FindMatch();
@@ -237,26 +241,25 @@ public class BubbleTransport : Mirror.Transport
 
     private void Awake()
     {
-        try
-        {
-           networkManager = GetComponent<Mirror.NetworkManager>();
+        try{
+            networkManager = GetComponent<Mirror.NetworkManager>();
         }
-        catch
-        {
+        catch{
             Debug.LogError("Nework Manager could not be found");
         }
 
         if (instance == null)
             instance = this;
-                
-
-        DebugLogConsole.AddCommand<string>("msg", "Sends the message", SendMessageToServer);
+        
+        //Register all delegates
         RegisterClientDataRecieveCallback(OnClientDidDataRecieved);
         RegisterServerDataRecieveCallback(OnServerDidDataRecieved);
         RegisterOnServerConnectedCallback(OnServerConnectedCallback);
         RegisterOnServerStartCallback(OnServerStartCallback);
         RegisterOnClientStartCallback(OnClientStartCallback);
-        
+        RegisterOnServerDisconnectedCallback(ServerDisconnectedCallback);
+
+
         _InitGameCenter();
     }
 }

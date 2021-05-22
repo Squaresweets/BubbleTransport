@@ -4,6 +4,7 @@
 @protocol GCHelperDelegate
 - (void)matchStarted;
 - (void)matchEnded;
+- (void)playerDisconnected:(GKPlayer *)player;
 - (void)match:(GKMatch *)match didReceiveData:(NSData *)data
    fromRemotePlayer:(GKPlayer *)playerID;
 -(void)inviteReceived;

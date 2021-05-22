@@ -147,12 +147,6 @@ int PlayerSort(const void *Element1, const void *Element2)
     [presentingViewController dismissViewControllerAnimated:NO completion:nil];
     if(pendingInvite != nil)
     {
-        //GKMatchRequest *request = [[[GKMatchRequest alloc] init] autorelease];
-        GKMatchRequest *request = [[GKMatchRequest alloc] init];
-        
-        //GKMatchmakerViewController *mmvc =
-        //    [[[GKMatchmakerViewController alloc] initWithMatchRequest:request] autorelease];
-        
         GKMatchmakerViewController *mmvc = [[GKMatchmakerViewController alloc] initWithInvite:pendingInvite];
         mmvc.matchmakerDelegate = self;
         
@@ -204,7 +198,7 @@ int PlayerSort(const void *Element1, const void *Element2)
     match.delegate = self;
     if (!matchStarted && match.expectedPlayerCount == 0) {
         NSLog(@"Ready to start match!");
-[self lookupPlayers];
+        [self lookupPlayers];
     }
 }
 
@@ -217,15 +211,9 @@ int PlayerSort(const void *Element1, const void *Element2)
 }
 - (void)match:(GKMatch *)theMatch player:(GKPlayer *)player didChangeConnectionState:(GKPlayerConnectionState)state {
     if (match != theMatch) return;
-    NSLog(@"Connection State Changed");
-}
-
-// The player state changed (eg. connected or disconnected)
-- (void)match:(GKMatch *)theMatch player:(NSString *)playerID didChange:(GKPlayerConnectionState)state {
-    if (match != theMatch) return;
     
     switch (state) {
-        case GKPlayerStateConnected: 
+        case GKPlayerStateConnected:
             // handle a new player connection.
             NSLog(@"Player connected!");
             
@@ -234,19 +222,19 @@ int PlayerSort(const void *Element1, const void *Element2)
                 [self lookupPlayers];
             }
             
-            break; 
+            break;
         case GKPlayerStateDisconnected:
-            // a player just disconnected. 
+            // a player just disconnected.
             NSLog(@"Player disconnected!");
             matchStarted = NO;
-            [self.delegate matchEnded];
+            [self.delegate playerDisconnected:player];
             break;
         case GKPlayerStateUnknown:
             NSLog(@"Player state unknown!");
             matchStarted = NO;
             [self.delegate matchEnded];
             break;
-    }                     
+    }
 }
 
 // The match was unable to connect with the player due to an error.
