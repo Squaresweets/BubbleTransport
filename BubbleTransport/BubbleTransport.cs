@@ -3,9 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
-
 using UnityEngine.Events;
 
+[DisallowMultipleComponent]
 public class BubbleTransport : Mirror.Transport
 {
     public static BubbleTransport instance;
@@ -59,43 +59,12 @@ public class BubbleTransport : Mirror.Transport
     [HideInInspector]
     public Mirror.NetworkManager networkManager;
 
-    //TODO:
-    /*
-    - activeTransport
-        -The current transport used by Mirror
-    - Available
-        -Easy stuff, tho it may take a callback to get whether gamecenter is supported
-
-    -GetMaxBackSize/GetMaxPacketSize
-        -Speek for themselves
-
-    ~~~~~ C A L L B A C K S ~~~~~
-    
-    -OnClientDisconnected
-        -Should be possible with https://developer.apple.com/documentation/gamekit/gkmatchdelegate, or with [self.delegate matchEnded]
-
-    -OnServerDisconnected
-        -For when a client disconnects
-
-    -OnClientError / OnServerError
-        -Should also be possible with https://developer.apple.com/documentation/gamekit/gkmatchdelegate, though it may be hard to convert over the error, IDK
-
-        
-    ~~~~~ M E T H O D S ~~~~~
-    
-    -ClientConnected
-        -Just says if you are connected
-    
-    -ServerActive
-        -Just says if the server is active
-    -ServerDisconnect
-        -Used to kick out a client
-    */
+    bool available = true;
 
     #region Other
     public override bool Available()
     {
-        return Application.platform == RuntimePlatform.IPhonePlayer;
+        return Application.platform == RuntimePlatform.IPhonePlayer && available;
     }
 
     //~~~~~~~~~~ These two functions are all sorted out by game center, and these should not be called by anything other than the transport, if you want to start a game use FindMatch(); ~~~~~~~~~~
@@ -250,16 +219,20 @@ public class BubbleTransport : Mirror.Transport
 
         if (instance == null)
             instance = this;
-        
-        //Register all delegates
-        RegisterClientDataRecieveCallback(OnClientDidDataRecieved);
-        RegisterServerDataRecieveCallback(OnServerDidDataRecieved);
-        RegisterOnServerConnectedCallback(OnServerConnectedCallback);
-        RegisterOnServerStartCallback(OnServerStartCallback);
-        RegisterOnClientStartCallback(OnClientStartCallback);
-        RegisterOnServerDisconnectedCallback(ServerDisconnectedCallback);
 
+        try{
+            //Register all delegates
+            RegisterClientDataRecieveCallback(OnClientDidDataRecieved);
+            RegisterServerDataRecieveCallback(OnServerDidDataRecieved);
+            RegisterOnServerConnectedCallback(OnServerConnectedCallback);
+            RegisterOnServerStartCallback(OnServerStartCallback);
+            RegisterOnClientStartCallback(OnClientStartCallback);
+            RegisterOnServerDisconnectedCallback(ServerDisconnectedCallback);
 
-        _InitGameCenter();
+            _InitGameCenter();
+        }
+        catch{
+            available = false;
+        }
     }
 }
