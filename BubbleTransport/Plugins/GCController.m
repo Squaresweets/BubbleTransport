@@ -18,6 +18,8 @@ typedef void (*OnServerConnectedDelegate)(int connId);
 OnServerConnectedDelegate ServerConnected = NULL;
 typedef void (*OnServerStartDelegate)();
 OnServerStartDelegate ServerStart = NULL;
+typedef void (*ServerStopDelegate)();
+ServerStopDelegate ServerStop = NULL;
 typedef void (*OnClientDisconnectedDelegate)();
 OnClientDisconnectedDelegate ClientDisconnected = NULL;
 typedef void (*OnServerDisconnectedDelegate)(int connID);
@@ -33,10 +35,10 @@ static BOOL* isServer = NULL;
 {
     [[GCHelper sharedInstance] authenticateLocalUser:[GCController myClass]];
 }
-+ (void) findMatch
++ (void) findMatch:(int)minPlayers maxPlayers:(int)maxPlayers
 {
     UIViewController* viewcontroller = (UIViewController*) [UIApplication sharedApplication].delegate;
-    [[GCHelper sharedInstance] findMatchWithMinPlayers:2 maxPlayers:4
+    [[GCHelper sharedInstance] findMatchWithMinPlayers:minPlayers maxPlayers:maxPlayers
     viewController:viewcontroller];
 }
 + (void) Shutdown
@@ -44,7 +46,6 @@ static BOOL* isServer = NULL;
     [[GCHelper sharedInstance].match disconnect];
     [GCHelper sharedInstance].match.delegate = nil;
 }
-
 
 +(void)sendDataToServer:(NSData *)data datamode:(int)channel
 {
@@ -125,10 +126,19 @@ char* convertNSStringToCString(const NSString* nsString)
 
 - (void)playerDisconnected:(GKPlayer *)player
 {
-    if(player == serverPlayer)
+    if([player.playerID isEqualToString:serverPlayer.playerID])
         ClientDisconnected();
     else if (isServer)
         ServerDisconnected([self getConnID:player]);
+}
+- (void)inviteReceived
+{
+    if(isServer)
+        ClientDisconnected();
+    else
+        ServerStop();
+    //Numbers do not matter as it initiated from invite
+    [GCController findMatch:2 maxPlayers:4];
 }
 - (void)match:(GKMatch *)match didReceiveData:(NSData *)data fromRemotePlayer:(GKPlayer *)player {
     NSUInteger len = [data length];
@@ -160,9 +170,9 @@ extern "C"
     {
         [GCController InitGameCenter];
     }
-    void _FindMatch()
+    void _FindMatch(int minPlayers, int maxPlayers)
     {
-        [GCController findMatch];
+        [GCController findMatch:minPlayers maxPlayers:maxPlayers];
     }
     void _Shutdown()
     {
@@ -208,6 +218,14 @@ extern "C"
         if(ServerStart == NULL)
         {
             ServerStart = callback;
+        }
+    }
+    typedef void (*ServerStopDelegate)();
+    void RegisterServerStopCallback(ServerStopDelegate callback)
+    {
+        if(ServerStop == NULL)
+        {
+            ServerStop = callback;
         }
     }
     typedef void (*OnClientStartDelegate)();

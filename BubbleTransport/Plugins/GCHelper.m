@@ -2,8 +2,6 @@
 #import <GameKit/GameKit.h>
 #import "GCHelper.h"
 
-//Most code from: https://www.raywenderlich.com/3074-game-center-tutorial-for-ios-how-to-make-a-simple-multiplayer-game-part-1-2
-
 extern UIViewController *UnityGetGLViewController();
 
 @implementation GCHelper

@@ -10,11 +10,12 @@ public class BubbleTransport : Mirror.Transport
 {
     public static BubbleTransport instance;
 
+    #region DllImports
     [DllImport("__Internal")]
     private static extern void _InitGameCenter();
 
     [DllImport("__Internal")]
-    private static extern void _FindMatch();
+    private static extern void _FindMatch(int minPlayers, int maxPlayers);
 
     [DllImport("__Internal")]
     private static extern void _Shutdown();
@@ -41,23 +42,25 @@ public class BubbleTransport : Mirror.Transport
     private static extern void RegisterOnServerDisconnectedCallback(OnServerDisconnectedDelegate onServerDisconnected);
 
     [DllImport("__Internal")]
+    private static extern void RegisterServerStopCallback(ServerStopDelegate serverStop);
+
+    [DllImport("__Internal")]
     private static extern void RegisterOnClientDisconnectedCallback(OnClientDisconnectedDelegate onClientDisconnected);
 
     [DllImport("__Internal")]
     private static extern void RegisterOnClientStartCallback(OnClientStartDelegate onClientStart);
-    
-    [Serializable]
-    /// <summary>
-    /// Function definition for a button click event.
-    /// </summary>
-    public class MatchFoundEvent : UnityEvent { }
+    #endregion
 
-    // Event delegates triggered on click.
+    public int MinPlayers = 2;
+
+    [Serializable]
+    public class MatchFoundEvent : UnityEvent { }
     [SerializeField]
     private MatchFoundEvent matchFound = new MatchFoundEvent();
 
     [HideInInspector]
-    public Mirror.NetworkManager networkManager;
+    private Mirror.NetworkManager networkManager;
+
 
     bool available = true;
 
@@ -191,6 +194,13 @@ public class BubbleTransport : Mirror.Transport
         instance.networkManager.StartHost();
     }
 
+    delegate void ServerStopDelegate();
+    [AOT.MonoPInvokeCallback(typeof(ServerStopDelegate))]
+    static void ServerStopCallback()
+    {
+        instance.networkManager.StopHost();
+    }
+
     public override void ServerStop()
     {
         _Shutdown();
@@ -205,7 +215,12 @@ public class BubbleTransport : Mirror.Transport
     /// </summary>
     public void FindMatch()
     {
-        _FindMatch();
+        if(networkManager.maxConnections > 4)
+        {
+            Debug.LogError("Real time Game Center Matches support a max of 4 players");
+            return;
+        }
+        _FindMatch(MinPlayers, networkManager.maxConnections);
     }
 
     private void Awake()
@@ -227,7 +242,9 @@ public class BubbleTransport : Mirror.Transport
             RegisterOnServerConnectedCallback(OnServerConnectedCallback);
             RegisterOnServerStartCallback(OnServerStartCallback);
             RegisterOnClientStartCallback(OnClientStartCallback);
+            RegisterOnClientDisconnectedCallback(ClientDisconnectedCallback);
             RegisterOnServerDisconnectedCallback(ServerDisconnectedCallback);
+            RegisterServerStopCallback(ServerStopCallback);
 
             _InitGameCenter();
         }

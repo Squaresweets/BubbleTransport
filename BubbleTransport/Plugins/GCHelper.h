@@ -7,7 +7,7 @@
 - (void)playerDisconnected:(GKPlayer *)player;
 - (void)match:(GKMatch *)match didReceiveData:(NSData *)data
    fromRemotePlayer:(GKPlayer *)playerID;
--(void)inviteReceived;
+- (void)inviteReceived;
 @end
 
 @interface GCHelper : NSObject <GKMatchmakerViewControllerDelegate, GKMatchDelegate, GKLocalPlayerListener>
