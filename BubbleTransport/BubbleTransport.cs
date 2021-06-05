@@ -49,19 +49,26 @@ public class BubbleTransport : Mirror.Transport
 
     [DllImport("__Internal")]
     private static extern void RegisterOnClientStartCallback(OnClientStartDelegate onClientStart);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterInviteRecieveCallback(OnInviteRecievedDelegate InviteRecieved);
     #endregion
 
     public int MinPlayers = 2;
-
+    
     [Serializable]
     public class MatchFoundEvent : UnityEvent { }
     [SerializeField]
     private MatchFoundEvent matchFound = new MatchFoundEvent();
 
+    [Serializable]
+    public class InviteRecievedEvent : UnityEvent { }
+    [SerializeField]
+    private MatchFoundEvent inviteRecieved = new MatchFoundEvent();
+
     [HideInInspector]
     private Mirror.NetworkManager networkManager;
-
-
+    
     bool available = true;
 
     #region Other
@@ -82,6 +89,22 @@ public class BubbleTransport : Mirror.Transport
     public override void Shutdown()
     {
         _Shutdown();
+    }
+    delegate void OnInviteRecievedDelegate();
+    [AOT.MonoPInvokeCallback(typeof(OnInviteRecievedDelegate))]
+    static void OnInviteRecieved()
+    {
+        if(instance.networkManager.isNetworkActive)
+        {
+            if (Mirror.NetworkServer.active)
+                instance.networkManager.StopHost();
+            else
+                instance.networkManager.StopClient();
+        }
+        instance.inviteRecieved.Invoke();
+
+        //Numbers do not matter, it instantiates from an invite
+        _FindMatch(2, 4);
     }
     #endregion
 
@@ -245,6 +268,7 @@ public class BubbleTransport : Mirror.Transport
             RegisterOnClientDisconnectedCallback(ClientDisconnectedCallback);
             RegisterOnServerDisconnectedCallback(ServerDisconnectedCallback);
             RegisterServerStopCallback(ServerStopCallback);
+            RegisterInviteRecieveCallback(OnInviteRecieved);
 
             _InitGameCenter();
         }

@@ -26,6 +26,8 @@ typedef void (*OnServerDisconnectedDelegate)(int connID);
 OnServerDisconnectedDelegate ServerDisconnected = NULL;
 typedef void (*OnClientStartDelegate)();
 OnClientStartDelegate ClientStart = NULL;
+typedef void (*OnInviteRecievedDelegate)();
+OnInviteRecievedDelegate InviteRecieved = NULL;
 
 static GKPlayer* serverPlayer = NULL;
 static BOOL* isServer = NULL;
@@ -116,6 +118,9 @@ char* convertNSStringToCString(const NSString* nsString)
         NSLog(@"CLIENT WOOO");
         isServer = NO;
         serverPlayer = [GCHelper sharedInstance].players[0];
+        //This is a bit of a hack, but it really does solve alot of bugs caused by clients joining too early :/
+        sleep([self getConnID:GKLocalPlayer.localPlayer]);
+        
         ClientStart();
     }
     
@@ -133,12 +138,7 @@ char* convertNSStringToCString(const NSString* nsString)
 }
 - (void)inviteReceived
 {
-    if(isServer)
-        ClientDisconnected();
-    else
-        ServerStop();
-    //Numbers do not matter as it initiated from invite
-    [GCController findMatch:2 maxPlayers:4];
+    InviteRecieved();
 }
 - (void)match:(GKMatch *)match didReceiveData:(NSData *)data fromRemotePlayer:(GKPlayer *)player {
     NSUInteger len = [data length];
@@ -258,6 +258,14 @@ extern "C"
         if(ServerRecievedData == NULL)
         {
             ServerRecievedData = callback;
+        }
+    }
+    typedef void (*OnInivteRecievedDelegate)();
+    void RegisterInviteRecieveCallback(OnInviteRecievedDelegate callback)
+    {
+        if(InviteRecieved == NULL)
+        {
+            InviteRecieved = callback;
         }
     }
 #ifdef  _cplusplus

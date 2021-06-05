@@ -165,8 +165,7 @@ int PlayerSort(const void *Element1, const void *Element2)
         //GKMatchmakerViewController *mmvc =
         //    [[[GKMatchmakerViewController alloc] initWithMatchRequest:request] autorelease];
         
-        GKMatchmakerViewController *mmvc =
-        [[GKMatchmakerViewController alloc] initWithMatchRequest:request];
+        GKMatchmakerViewController *mmvc = [[GKMatchmakerViewController alloc] initWithMatchRequest:request];
         mmvc.matchmakerDelegate = self;
         
         [presentingViewController presentViewController:mmvc animated:YES completion:nil];
