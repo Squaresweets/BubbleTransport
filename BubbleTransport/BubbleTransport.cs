@@ -133,7 +133,8 @@ public class BubbleTransport : Mirror.Transport
 
     public override void Shutdown()
     {
-        _Shutdown();
+        if(Available())
+            _Shutdown();
     }
     delegate void OnInviteRecievedDelegate();
     [AOT.MonoPInvokeCallback(typeof(OnInviteRecievedDelegate))]
