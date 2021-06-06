@@ -25,7 +25,7 @@ Instead you call the **FindMatch()** function and Bubble will sort out the rest 
 2. Add the **BubbleTransport.cs** script to the **NetworkManager** object
 3. Replace the **Transport** field with the **BubbleTransport.cs** script
 4. Adjust callbacks to work with your game and add something to call the **FindMatch()** function
-5. If not already done, add the project to App Store Connect
+5. If not already done, add the project to App Store Connect **(Requires a developer license)**
 6. Once built for IOS, in the **UnityFramework** tab under **TARGETS** in XCode add the framework: **GameKit.framework** to the list of frameworks
 
 ## Testing your game locally
