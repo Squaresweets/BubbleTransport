@@ -34,4 +34,6 @@ Bubble transport does not work in the inspector as Game Center only works on IOS
 
 Bubble transport was made by [Matthew Collier](https://matthewcollier.co.uk/) and is **free & open source!**
 
+Some of the code comes from [this tutorial](https://www.raywenderlich.com/2487-game-center-tutorial-how-to-make-a-simple-multiplayer-game-with-sprite-kit-part-1-2), however **ALOT** has had to be changed to work with newer IOS versions and as a transport.
+
 But if it was useful to you, consider checking out [my game](https://matthewcollier.co.uk/in-the-slimelight/) that I made it for!
