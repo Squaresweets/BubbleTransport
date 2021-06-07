@@ -23,10 +23,11 @@ Instead you call the **FindMatch()** function and Bubble will sort out the rest 
 ## Setting Up
 1. With Mirror installed, download the files from the repository and add them to the project
 2. Add the **BubbleTransport.cs** script to the **NetworkManager** object
-3. Replace the **Transport** field with the **BubbleTransport.cs** script
+3. Replace the **Transport** field in the NetworkManager with the **BubbleTransport.cs** script
 4. Adjust callbacks to work with your game and add something to call the **FindMatch()** function
 5. If not already done, add the project to App Store Connect **(Requires a developer license)**
 6. Once built for IOS, in the **UnityFramework** tab under **TARGETS** in XCode add the framework: **GameKit.framework** to the list of frameworks
+![BubbleTransportTutorial](https://matthewcollier.co.uk/BubbleTransportTutorial.png)
 
 ## Testing your game locally
 Bubble transport does not work in the inspector as Game Center only works on IOS devices, if you want to test your game use **Telepathy Transport** instad of **Bubble Transport**.
