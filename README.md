@@ -1,5 +1,6 @@
 ![BubbleTransportLogo](https://matthewcollier.co.uk/BubbleTransportLongLogo.png)
-[![Showcase](https://img.shields.io/badge/showcase-brightgreen.svg)](https://www.youtube.com/watch?v=e-RCPvUYxr4)
+[![Showcase](https://img.shields.io/badge/showcase-brightgreen.svg?&color=success)](https://www.youtube.com/watch?v=e-RCPvUYxr4)
+[![release](https://img.shields.io/github/v/release/squaresweets/BubbleTransport.svg?&color=success)](https://github.com/vis2k/Mirror/releases/latest)
 [![Discord](https://img.shields.io/discord/672474661388288021.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/6hswr9j)
 [<img src="https://img.shields.io/twitter/follow/SqSweetsGames?style=social" /></a>](https://twitter.com/SqSweetsGames)
 [<img src="https://forthebadge.com/images/badges/gluten-free.svg" height=20/></a>](https://forthebadge.com)
