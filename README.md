@@ -21,7 +21,7 @@ Instead you call the **FindMatch()** function and Bubble will sort out the rest 
 * Unity events when matches are found or when an invite is recieved
 
 ## Setting Up
-1. With Mirror installed, download the files from the repository and add them to the project
+1. With Mirror installed, download the latest release as a .unitypackage and import it into your project
 2. Add the **BubbleTransport.cs** script to the **NetworkManager** object
 3. Replace the **Transport** field in the NetworkManager with the **BubbleTransport.cs** script
 4. Adjust callbacks to work with your game and add something to call the **FindMatch()** function
