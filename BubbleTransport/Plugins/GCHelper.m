@@ -156,14 +156,10 @@ int PlayerSort(const void *Element1, const void *Element2)
     else
     {
         
-        //GKMatchRequest *request = [[[GKMatchRequest alloc] init] autorelease];
         GKMatchRequest *request = [[GKMatchRequest alloc] init];
         request.minPlayers = minPlayers;
         request.maxPlayers = maxPlayers;
         request.recipients = pendingPlayersToInvite;
-        
-        //GKMatchmakerViewController *mmvc =
-        //    [[[GKMatchmakerViewController alloc] initWithMatchRequest:request] autorelease];
         
         GKMatchmakerViewController *mmvc = [[GKMatchmakerViewController alloc] initWithMatchRequest:request];
         mmvc.matchmakerDelegate = self;

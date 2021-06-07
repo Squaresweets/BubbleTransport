@@ -6,10 +6,6 @@
 
 extern UIViewController *UnityGetGLViewController();
 
-//@interface GCController : NSObject
-
-//@end
-
 typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count);
 OnClientDidDataRecievedDelegate ClientRecievedData = NULL;
 typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count);
@@ -40,8 +36,7 @@ static BOOL* isServer = NULL;
 + (void) findMatch:(int)minPlayers maxPlayers:(int)maxPlayers
 {
     UIViewController* viewcontroller = (UIViewController*) [UIApplication sharedApplication].delegate;
-    [[GCHelper sharedInstance] findMatchWithMinPlayers:minPlayers maxPlayers:maxPlayers
-    viewController:viewcontroller];
+    [[GCHelper sharedInstance] findMatchWithMinPlayers:minPlayers maxPlayers:maxPlayers viewController:viewcontroller];
 }
 + (void) Shutdown
 {
@@ -67,21 +62,9 @@ static BOOL* isServer = NULL;
         NSLog(@"Error sending message");
     }
 }
-
 +(id)myClass
 {
     return [[self alloc] init];
-}
-char* convertNSStringToCString(const NSString* nsString)
-{
-    if(nsString == NULL)
-        return NULL;
-    
-    const char* nsStringUtf8 = [nsString UTF8String];
-    char* cString = (char*)malloc(strlen(nsStringUtf8) + 1);
-    strcpy(cString, nsStringUtf8);
-    
-    return cString;
 }
 -(int)getConnID:(GKPlayer *)player
 {
@@ -101,11 +84,9 @@ char* convertNSStringToCString(const NSString* nsString)
 
 #pragma mark GCHelperDelegate
 - (void)matchStarted{
-    
     [[GCHelper sharedInstance].presentingViewController dismissViewControllerAnimated:YES completion:nil];
     if([GCHelper sharedInstance].players[0] == GKLocalPlayer.localPlayer)
     {
-        NSLog(@"SERVER WOOO");
         isServer = YES;
         ServerStart();
         
@@ -115,7 +96,6 @@ char* convertNSStringToCString(const NSString* nsString)
     }
     else
     {
-        NSLog(@"CLIENT WOOO");
         isServer = NO;
         serverPlayer = [GCHelper sharedInstance].players[0];
         //This is a bit of a hack, but it really does solve alot of bugs caused by clients joining too early :/
@@ -123,9 +103,6 @@ char* convertNSStringToCString(const NSString* nsString)
         
         ClientStart();
     }
-    
-    
-    NSLog(@"Match Started");
 }
 
 
