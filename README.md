@@ -27,7 +27,7 @@ Instead you call the **FindMatch()** function and Bubble will sort out the rest 
 4. Adjust callbacks to work with your game and add something to call the **FindMatch()** function
 5. If not already done, add the project to App Store Connect **(Requires a developer license)**
 6. Once built for IOS, in the **UnityFramework** tab under **TARGETS** in XCode add the framework: **GameKit.framework** to the list of frameworks
-![BubbleTransportTutorial](https://matthewcollier.co.uk/BubbleTransportTutorial.png)
+![BubbleTransportTutorial](https://matthewcollier.co.uk/BubbleTutorial.png)
 
 ## Testing your game locally
 Bubble transport does not work in the inspector as Game Center only works on IOS devices, if you want to test your game use **Telepathy Transport** instad of **Bubble Transport**.
