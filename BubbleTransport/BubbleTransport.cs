@@ -6,6 +6,8 @@ using UnityEngine.iOS;
 using System.Runtime.InteropServices;
 using UnityEngine.Events;
 
+using UnityEngine.SceneManagement;
+
 [DisallowMultipleComponent]
 public class BubbleTransport : Mirror.Transport
 {
@@ -56,7 +58,10 @@ public class BubbleTransport : Mirror.Transport
     #endregion
 
     public int MinPlayers = 2;
-    
+    [Tooltip("Incase you are in a scene such as a menu when an invite is recieved, set this to the scene where matches normally start")]
+    [Mirror.Scene]
+    public string InviteRecievedScene;
+
     [Serializable]
     public class MatchFoundEvent : UnityEvent { }
     [SerializeField]
@@ -66,9 +71,10 @@ public class BubbleTransport : Mirror.Transport
     public class InviteRecievedEvent : UnityEvent { }
     [SerializeField]
     private MatchFoundEvent inviteRecieved = new MatchFoundEvent();
-    
-    bool available = true;
 
+
+    bool available = true;
+    
     /* Structure of the transport
     
     Without an Invite:
@@ -116,7 +122,7 @@ public class BubbleTransport : Mirror.Transport
         _FindMatch(MinPlayers, Mirror.NetworkManager.singleton.maxConnections);
     }
 
-    #region Other
+    #region Misc
     public override bool Available()
     {
         return Application.platform == RuntimePlatform.IPhonePlayer && available && new Version(Device.systemVersion) >= new Version("13.0");
@@ -148,10 +154,21 @@ public class BubbleTransport : Mirror.Transport
             else
                 Mirror.NetworkManager.singleton.StopClient();
         }
+        else if(instance.InviteRecievedScene != null && instance.InviteRecievedScene != SceneManager.GetActiveScene().path)
+        {
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            SceneManager.LoadScene(instance.InviteRecievedScene);
+            return;
+        }
         instance.inviteRecieved.Invoke();
 
         //Numbers do not matter, it instantiates from an invite
-        _FindMatch(2, 4);
+        _FindMatch(0, 0);
+    }
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        OnInviteRecieved();
     }
     #endregion
 
@@ -308,7 +325,8 @@ public class BubbleTransport : Mirror.Transport
         if (instance == null)
             instance = this;
 
-        try{
+        try
+        {
             //Register all delegates
             RegisterClientDataRecieveCallback(OnClientDidDataRecieved);
             RegisterServerDataRecieveCallback(OnServerDidDataRecieved);
@@ -322,7 +340,8 @@ public class BubbleTransport : Mirror.Transport
 
             _InitGameCenter();
         }
-        catch{
+        catch
+        {
             //If you get an error while registering them than the transport is not available
             available = false;
         }
