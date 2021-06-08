@@ -31,7 +31,7 @@ Instead you call the **FindMatch()** function and Bubble will sort out the rest 
 ![BubbleTransportTutorial](https://matthewcollier.co.uk/BubbleTutorial.png)
 
 ## Testing your game locally
-Bubble transport does not work in the inspector as Game Center only works on IOS devices, if you want to test your game use **Telepathy Transport** instad of **Bubble Transport**.
+Bubble transport does not work in the inspector as Game Center only works on IOS devices, if you want to test your game use **Telepathy Transport** instead of **Bubble Transport**.
 
 ## Credits and licence
 
