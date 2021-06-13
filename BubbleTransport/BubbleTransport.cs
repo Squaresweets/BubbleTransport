@@ -2,10 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.iOS;
 using System.Runtime.InteropServices;
 using UnityEngine.Events;
-
+#if UNITY_IOS
+using UnityEngine.iOS;
+#endif
 using UnityEngine.SceneManagement;
 
 [DisallowMultipleComponent]
@@ -13,7 +14,7 @@ public class BubbleTransport : Mirror.Transport
 {
     public static BubbleTransport instance;
 
-    #region DllImports
+#region DllImports
     [DllImport("__Internal")]
     private static extern void _InitGameCenter();
 
@@ -55,7 +56,7 @@ public class BubbleTransport : Mirror.Transport
 
     [DllImport("__Internal")]
     private static extern void RegisterInviteRecieveCallback(OnInviteRecievedDelegate InviteRecieved);
-    #endregion
+#endregion
 
     public int MinPlayers = 2;
     [Tooltip("Incase you are in a scene such as a menu when an invite is recieved, set this to the scene where matches normally start")]
@@ -74,7 +75,11 @@ public class BubbleTransport : Mirror.Transport
 
 
     bool available = true;
-    
+
+    bool connected = false;
+
+    bool needToDisconnect = false;
+
     /* Structure of the transport
     
     Without an Invite:
@@ -122,10 +127,15 @@ public class BubbleTransport : Mirror.Transport
         _FindMatch(MinPlayers, Mirror.NetworkManager.singleton.maxConnections);
     }
 
-    #region Misc
+
+#region Misc
     public override bool Available()
     {
+#if UNITY_IOS
         return Application.platform == RuntimePlatform.IPhonePlayer && available && new Version(Device.systemVersion) >= new Version("13.0");
+#else
+        return false;
+#endif
     }
 
     //~~~~~~~~~~ These two functions are all sorted out by game center, and these should not be called by anything other than the transport, if you want to start a game use FindMatch(); ~~~~~~~~~~
@@ -140,14 +150,17 @@ public class BubbleTransport : Mirror.Transport
     public override void Shutdown()
     {
         if(Available())
+        {
             _Shutdown();
+            connected = false;
+        }
     }
     delegate void OnInviteRecievedDelegate();
     [AOT.MonoPInvokeCallback(typeof(OnInviteRecievedDelegate))]
     static void OnInviteRecieved()
     {
         //An invite has been recieved, we shutdown the network and then call FindMatch
-        if(Mirror.NetworkManager.singleton.isNetworkActive)
+        if (Mirror.NetworkManager.singleton.isNetworkActive)
         {
             if (Mirror.NetworkServer.active)
                 Mirror.NetworkManager.singleton.StopHost();
@@ -160,7 +173,9 @@ public class BubbleTransport : Mirror.Transport
             SceneManager.LoadScene(instance.InviteRecievedScene);
             return;
         }
-        instance.inviteRecieved.Invoke();
+        instance.inviteRecieved?.Invoke();
+
+        print(SceneManager.GetActiveScene().path);
 
         //Numbers do not matter, it instantiates from an invite
         _FindMatch(0, 0);
@@ -170,21 +185,23 @@ public class BubbleTransport : Mirror.Transport
         SceneManager.sceneLoaded -= OnSceneLoaded;
         OnInviteRecieved();
     }
-    #endregion
+#endregion
 
-    #region Client
+#region Client
     public override bool ClientConnected()
     {
-        return Mirror.NetworkManager.singleton.isNetworkActive && !Mirror.NetworkServer.active;
+        return connected && !Mirror.NetworkServer.active;
     }
 
     public override void ClientDisconnect()
     {
+        instance.connected = false;
         _Shutdown();
     }
 
     public override void ClientSend(int channelId, ArraySegment<byte> segment)
     {
+        if (!connected) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
         SendMessageToServer(segment.Array, segment.Offset, segment.Count, channelId);
     }
@@ -199,13 +216,15 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnClientDisconnectedDelegate))]
     static void ClientDisconnectedCallback()
     {
-        instance.OnClientDisconnected.Invoke();
+        instance.needToDisconnect = true;
     }
 
     delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count);
     [AOT.MonoPInvokeCallback(typeof(OnClientDidDataRecievedDelegate))]
     static void OnClientDidDataRecieved(IntPtr data, int offset, int count)
     {
+        if (!instance.enabled || !instance.connected)
+            return;
         /*
         We get a pointer back from the plugin containing the location of the array of bytes
         Data recieved is formatted like this:
@@ -221,23 +240,24 @@ public class BubbleTransport : Mirror.Transport
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
-        instance.OnClientDataReceived.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
+        instance.OnClientDataReceived?.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
     }
 
     delegate void OnClientStartDelegate();
     [AOT.MonoPInvokeCallback(typeof(OnClientStartDelegate))]
     static void OnClientStartCallback()
     {
+        instance.connected = true;
         instance.matchFound.Invoke();
         Mirror.NetworkManager.singleton.StartClient();
-        instance.OnClientConnected.Invoke();
+        instance.OnClientConnected?.Invoke();
     }
-    #endregion
+#endregion
 
-    #region Server
+#region Server
     public override bool ServerActive()
     {
-        return Mirror.NetworkManager.singleton.isNetworkActive && Mirror.NetworkServer.active;
+        return connected && Mirror.NetworkServer.active;
     }
 
     public override bool ServerDisconnect(int connectionId)
@@ -248,6 +268,7 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ServerSend(int connectionId, int channelId, ArraySegment<byte> segment)
     {
+        if (!connected) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
         SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count, channelId);
     }
@@ -262,14 +283,17 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnServerDisconnectedDelegate))]
     static void ServerDisconnectedCallback(int connID)
     {
+        instance.connected = false;
         print("Server disconnected callback");
-        instance.OnServerDisconnected.Invoke(connID);
+        instance.OnServerDisconnected?.Invoke(connID);
     }
 
     delegate void OnServerDidDataRecievedDelegate(int connId, IntPtr data, int offset, int count);
     [AOT.MonoPInvokeCallback(typeof(OnServerDidDataRecievedDelegate))]
     static void OnServerDidDataRecieved(int connId, IntPtr data, int offset, int count)
     {
+        if (!instance.enabled || !instance.connected)
+            return;
         /*
         We get a pointer back from the plugin containing the location of the array of bytes
         Data recieved is formatted like this:
@@ -285,7 +309,7 @@ public class BubbleTransport : Mirror.Transport
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
-        instance.OnServerDataReceived.Invoke(connId, new ArraySegment<byte>(_data, offset, count), 0);
+        instance.OnServerDataReceived?.Invoke(connId, new ArraySegment<byte>(_data, offset, count), 0);
     }
 
     /// <summary>
@@ -295,14 +319,15 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnServerConnectedDelegate))]
     static void OnServerConnectedCallback(int connId)
     {
-        instance.OnServerConnected.Invoke(connId);
+        instance.OnServerConnected?.Invoke(connId);
     }
 
     delegate void OnServerStartDelegate();
     [AOT.MonoPInvokeCallback(typeof(OnServerStartDelegate))]
     static void OnServerStartCallback()
     {
-        instance.matchFound.Invoke();
+        instance.connected = true;
+        instance.matchFound?.Invoke();
         Mirror.NetworkManager.singleton.StartHost();
     }
 
@@ -310,6 +335,7 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(ServerStopDelegate))]
     static void ServerStopCallback()
     {
+        instance.connected = false;
         Mirror.NetworkManager.singleton.StopHost();
     }
 
@@ -320,10 +346,21 @@ public class BubbleTransport : Mirror.Transport
 
     #endregion
 
+    private void LateUpdate()
+    {
+        //IK it is pretty messy but ah well
+        if(needToDisconnect)
+        {
+            OnClientDisconnected?.Invoke();
+            needToDisconnect = false;
+        }
+    }
     private void Awake()
     {
         if (instance == null)
             instance = this;
+        else
+            Destroy(this.gameObject);
 
         try
         {
