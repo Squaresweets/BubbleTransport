@@ -13,6 +13,7 @@ using UnityEngine.SceneManagement;
 public class BubbleTransport : Mirror.Transport
 {
     public static BubbleTransport instance;
+    static bool instanceCreated = false;
 
 #region DllImports
     [DllImport("__Internal")]
@@ -78,7 +79,7 @@ public class BubbleTransport : Mirror.Transport
 
     bool connected = false;
 
-    bool needToDisconnect = false;
+    bool needToDisconnectFlag = false;
 
     /* Structure of the transport
     
@@ -175,8 +176,6 @@ public class BubbleTransport : Mirror.Transport
         }
         instance.inviteRecieved?.Invoke();
 
-        print(SceneManager.GetActiveScene().path);
-
         //Numbers do not matter, it instantiates from an invite
         _FindMatch(0, 0);
     }
@@ -216,7 +215,7 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnClientDisconnectedDelegate))]
     static void ClientDisconnectedCallback()
     {
-        instance.needToDisconnect = true;
+        instance.needToDisconnectFlag = true;
     }
 
     delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count);
@@ -346,21 +345,21 @@ public class BubbleTransport : Mirror.Transport
 
     #endregion
 
-    private void LateUpdate()
+    public override void ClientLateUpdate()
     {
-        //IK it is pretty messy but ah well
-        if(needToDisconnect)
+        if(needToDisconnectFlag)
         {
             OnClientDisconnected?.Invoke();
-            needToDisconnect = false;
+            needToDisconnectFlag = false;
         }
     }
     private void Awake()
     {
-        if (instance == null)
+        if (!instanceCreated)
+        {
             instance = this;
-        else
-            Destroy(this.gameObject);
+            instanceCreated = true;
+        }
 
         try
         {
