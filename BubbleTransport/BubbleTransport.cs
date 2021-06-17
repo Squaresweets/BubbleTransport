@@ -8,14 +8,14 @@ using UnityEngine.Events;
 using UnityEngine.iOS;
 #endif
 using UnityEngine.SceneManagement;
+using Mirror;
 
 [DisallowMultipleComponent]
-public class BubbleTransport : Mirror.Transport
+public class BubbleTransport : Transport
 {
     public static BubbleTransport instance;
-    static bool instanceCreated = false;
 
-#region DllImports
+    #region DllImports
     [DllImport("__Internal")]
     private static extern void _InitGameCenter();
 
@@ -73,6 +73,20 @@ public class BubbleTransport : Mirror.Transport
     public class InviteRecievedEvent : UnityEvent { }
     [SerializeField]
     private MatchFoundEvent inviteRecieved = new MatchFoundEvent();
+
+    static List<ArraySegment<Byte>> clientMessageBuffer = new List<ArraySegment<byte>>();
+    struct ServerMessage
+    {
+        public ArraySegment<Byte> message;
+        public int connId;
+
+        public ServerMessage(ArraySegment<byte> message, int connId) : this()
+        {
+            this.message = message;
+            this.connId = connId;
+        }
+    }
+    static List<ServerMessage> serverMessageBuffer = new List<ServerMessage>();
 
 
     bool available = true;
@@ -133,7 +147,7 @@ public class BubbleTransport : Mirror.Transport
     public override bool Available()
     {
 #if UNITY_IOS
-        return Application.platform == RuntimePlatform.IPhonePlayer && available && new Version(Device.systemVersion) >= new Version("13.0");
+        return Application.platform == RuntimePlatform.IPhonePlayer && available && new System.Version(Device.systemVersion) >= new System.Version("13.0");
 #else
         return false;
 #endif
@@ -146,7 +160,8 @@ public class BubbleTransport : Mirror.Transport
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    public override int GetMaxPacketSize(int channelId = 0) => 16384;
+    //Sizes from: https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/GameKit_Guide/Matchmaking/Matchmaking.html
+    public override int GetMaxPacketSize(int channelId = 0) { return channelId == 0 ? 89088 : 1000;  }
 
     public override void Shutdown()
     {
@@ -161,12 +176,12 @@ public class BubbleTransport : Mirror.Transport
     static void OnInviteRecieved()
     {
         //An invite has been recieved, we shutdown the network and then call FindMatch
-        if (Mirror.NetworkManager.singleton.isNetworkActive)
+        if (NetworkManager.singleton.isNetworkActive)
         {
-            if (Mirror.NetworkServer.active)
-                Mirror.NetworkManager.singleton.StopHost();
+            if (NetworkServer.active)
+                NetworkManager.singleton.StopHost();
             else
-                Mirror.NetworkManager.singleton.StopClient();
+                NetworkManager.singleton.StopClient();
         }
         else if(instance.InviteRecievedScene != null && instance.InviteRecievedScene != SceneManager.GetActiveScene().path)
         {
@@ -174,6 +189,7 @@ public class BubbleTransport : Mirror.Transport
             SceneManager.LoadScene(instance.InviteRecievedScene);
             return;
         }
+        activeTransport = instance;
         instance.inviteRecieved?.Invoke();
 
         //Numbers do not matter, it instantiates from an invite
@@ -200,7 +216,7 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ClientSend(int channelId, ArraySegment<byte> segment)
     {
-        if (!connected) return;
+        if (!connected || segment.Count > GetMaxPacketSize(channelId)) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
         SendMessageToServer(segment.Array, segment.Offset, segment.Count, channelId);
     }
@@ -222,7 +238,7 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnClientDidDataRecievedDelegate))]
     static void OnClientDidDataRecieved(IntPtr data, int offset, int count)
     {
-        if (!instance.enabled || !instance.connected)
+        if (!instance.connected)
             return;
         /*
         We get a pointer back from the plugin containing the location of the array of bytes
@@ -239,6 +255,13 @@ public class BubbleTransport : Mirror.Transport
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
+
+        if (!instance.enabled)
+        {
+            clientMessageBuffer.Add(new ArraySegment<byte>(_data, offset, count));
+            return;
+        }
+
         instance.OnClientDataReceived?.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
     }
 
@@ -267,7 +290,7 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ServerSend(int connectionId, int channelId, ArraySegment<byte> segment)
     {
-        if (!connected) return;
+        if (!connected || segment.Count > GetMaxPacketSize(channelId)) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
         SendMessageToClient(connectionId, segment.Array, segment.Offset, segment.Count, channelId);
     }
@@ -291,7 +314,7 @@ public class BubbleTransport : Mirror.Transport
     [AOT.MonoPInvokeCallback(typeof(OnServerDidDataRecievedDelegate))]
     static void OnServerDidDataRecieved(int connId, IntPtr data, int offset, int count)
     {
-        if (!instance.enabled || !instance.connected)
+        if (!instance.connected)
             return;
         /*
         We get a pointer back from the plugin containing the location of the array of bytes
@@ -308,6 +331,14 @@ public class BubbleTransport : Mirror.Transport
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
+
+        if (!instance.enabled)
+        {
+            //Stores messages in a buffer to be executed after the scene change
+            serverMessageBuffer.Add(new ServerMessage(new ArraySegment<byte>(_data, offset, count), connId));
+            return;
+        }
+
         instance.OnServerDataReceived?.Invoke(connId, new ArraySegment<byte>(_data, offset, count), 0);
     }
 
@@ -347,19 +378,37 @@ public class BubbleTransport : Mirror.Transport
 
     public override void ClientLateUpdate()
     {
+        if (instance != this) return;
         if(needToDisconnectFlag)
         {
             OnClientDisconnected?.Invoke();
             needToDisconnectFlag = false;
         }
+
+        //This executes any messages that were not executed during a scene change
+        for (int i = 0; i > clientMessageBuffer.Count; i++)
+        {
+            OnClientDataReceived?.Invoke(clientMessageBuffer[0], 0);
+            clientMessageBuffer.RemoveAt(0);
+        }
+    }
+    public override void ServerLateUpdate()
+    {
+        if (instance != this) return;
+
+        //This executes any messages that were not executed during a scene change
+        for (int i = 0; i > serverMessageBuffer.Count; i++)
+        {
+            OnServerDataReceived?.Invoke(serverMessageBuffer[0].connId, serverMessageBuffer[0].message, 0);
+            serverMessageBuffer.RemoveAt(0);
+        }
     }
     private void Awake()
     {
-        if (!instanceCreated)
-        {
+        if (instance == null)
             instance = this;
-            instanceCreated = true;
-        }
+        else
+            Destroy(this.gameObject);
 
         try
         {
