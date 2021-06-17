@@ -386,7 +386,7 @@ public class BubbleTransport : Transport
         }
 
         //This executes any messages that were not executed during a scene change
-        for (int i = 0; i > clientMessageBuffer.Count; i++)
+        for (int i = 0; i < clientMessageBuffer.Count; i++)
         {
             OnClientDataReceived?.Invoke(clientMessageBuffer[0], 0);
             clientMessageBuffer.RemoveAt(0);
@@ -397,7 +397,7 @@ public class BubbleTransport : Transport
         if (instance != this) return;
 
         //This executes any messages that were not executed during a scene change
-        for (int i = 0; i > serverMessageBuffer.Count; i++)
+        for (int i = 0; i < serverMessageBuffer.Count; i++)
         {
             OnServerDataReceived?.Invoke(serverMessageBuffer[0].connId, serverMessageBuffer[0].message, 0);
             serverMessageBuffer.RemoveAt(0);
