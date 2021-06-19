@@ -139,7 +139,7 @@ public class BubbleTransport : Transport
             Debug.LogError("Real time Game Center Matches support a max of 4 players");
             return;
         }
-        _FindMatch(MinPlayers, Mirror.NetworkManager.singleton.maxConnections);
+        _FindMatch(MinPlayers, NetworkManager.singleton.maxConnections);
     }
 
 
@@ -178,10 +178,12 @@ public class BubbleTransport : Transport
         //An invite has been recieved, we shutdown the network and then call FindMatch
         if (NetworkManager.singleton.isNetworkActive)
         {
+            SceneManager.sceneLoaded += OnSceneLoaded;
             if (NetworkServer.active)
                 NetworkManager.singleton.StopHost();
             else
                 NetworkManager.singleton.StopClient();
+            return;
         }
         else if(instance.InviteRecievedScene != null && instance.InviteRecievedScene != SceneManager.GetActiveScene().path)
         {
@@ -189,7 +191,6 @@ public class BubbleTransport : Transport
             SceneManager.LoadScene(instance.InviteRecievedScene);
             return;
         }
-        activeTransport = instance;
         instance.inviteRecieved?.Invoke();
 
         //Numbers do not matter, it instantiates from an invite
@@ -270,8 +271,9 @@ public class BubbleTransport : Transport
     static void OnClientStartCallback()
     {
         instance.connected = true;
+        activeTransport = instance;
         instance.matchFound.Invoke();
-        Mirror.NetworkManager.singleton.StartClient();
+        NetworkManager.singleton.StartClient();
         instance.OnClientConnected?.Invoke();
     }
 #endregion
@@ -357,6 +359,7 @@ public class BubbleTransport : Transport
     static void OnServerStartCallback()
     {
         instance.connected = true;
+        activeTransport = instance;
         instance.matchFound?.Invoke();
         Mirror.NetworkManager.singleton.StartHost();
     }
@@ -403,6 +406,12 @@ public class BubbleTransport : Transport
             serverMessageBuffer.RemoveAt(0);
         }
     }
+    private void Start()
+    {
+        //Done on start so we only accept an invite when when the scene has fully finished loading
+        if(Available())
+            _InitGameCenter();
+    }
     private void Awake()
     {
         if (instance == null)
@@ -422,8 +431,6 @@ public class BubbleTransport : Transport
             RegisterOnServerDisconnectedCallback(ServerDisconnectedCallback);
             RegisterServerStopCallback(ServerStopCallback);
             RegisterInviteRecieveCallback(OnInviteRecieved);
-
-            _InitGameCenter();
         }
         catch
         {
