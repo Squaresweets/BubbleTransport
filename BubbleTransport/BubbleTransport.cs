@@ -60,6 +60,7 @@ public class BubbleTransport : Transport
 #endregion
 
     public int MinPlayers = 2;
+    public int MaxReceivesPerTick = 1000;
     [Tooltip("Incase you are in a scene such as a menu when an invite is recieved, set this to the scene where matches normally start")]
     [Mirror.Scene]
     public string InviteRecievedScene;
@@ -257,13 +258,7 @@ public class BubbleTransport : Transport
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
 
-        if (!instance.enabled)
-        {
-            clientMessageBuffer.Add(new ArraySegment<byte>(_data, offset, count));
-            return;
-        }
-
-        instance.OnClientDataReceived?.Invoke(new ArraySegment<byte>(_data, offset, count), 0);
+        clientMessageBuffer.Add(new ArraySegment<byte>(_data, offset, count));
     }
 
     delegate void OnClientStartDelegate();
@@ -334,14 +329,7 @@ public class BubbleTransport : Transport
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
 
-        if (!instance.enabled)
-        {
-            //Stores messages in a buffer to be executed after the scene change
-            serverMessageBuffer.Add(new ServerMessage(new ArraySegment<byte>(_data, offset, count), connId));
-            return;
-        }
-
-        instance.OnServerDataReceived?.Invoke(connId, new ArraySegment<byte>(_data, offset, count), 0);
+        serverMessageBuffer.Add(new ServerMessage(new ArraySegment<byte>(_data, offset, count), connId));
     }
 
     /// <summary>
@@ -381,15 +369,15 @@ public class BubbleTransport : Transport
 
     public override void ClientLateUpdate()
     {
-        if (instance != this) return;
+        if (instance != this || !enabled) return;
         if(needToDisconnectFlag)
         {
             OnClientDisconnected?.Invoke();
             needToDisconnectFlag = false;
         }
 
-        //This executes any messages that were not executed during a scene change
-        for (int i = 0; i < clientMessageBuffer.Count; i++)
+        //This executes any messages that were recieved in the last frame
+        for (int i = 0; i < clientMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
             OnClientDataReceived?.Invoke(clientMessageBuffer[0], 0);
             clientMessageBuffer.RemoveAt(0);
@@ -397,10 +385,10 @@ public class BubbleTransport : Transport
     }
     public override void ServerLateUpdate()
     {
-        if (instance != this) return;
+        if (instance != this || !enabled) return;
 
-        //This executes any messages that were not executed during a scene change
-        for (int i = 0; i < serverMessageBuffer.Count; i++)
+        //This executes any messages that were recieved in the last frame
+        for (int i = 0; i < serverMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
             OnServerDataReceived?.Invoke(serverMessageBuffer[0].connId, serverMessageBuffer[0].message, 0);
             serverMessageBuffer.RemoveAt(0);
