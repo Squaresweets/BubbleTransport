@@ -76,18 +76,10 @@ public class BubbleTransport : Transport
     private MatchFoundEvent inviteRecieved = new MatchFoundEvent();
 
     static List<ArraySegment<Byte>> clientMessageBuffer = new List<ArraySegment<byte>>();
-    struct ServerMessage
-    {
-        public ArraySegment<Byte> message;
-        public int connId;
 
-        public ServerMessage(ArraySegment<byte> message, int connId) : this()
-        {
-            this.message = message;
-            this.connId = connId;
-        }
-    }
-    static List<ServerMessage> serverMessageBuffer = new List<ServerMessage>();
+    //Done this way as structs seem to be pretty slow
+    static List<ArraySegment<Byte>> serverMessageBuffer = new List<ArraySegment<byte>>();
+    static List<int> serverMessageBufferConnIds = new List<int>();
 
 
     bool available = true;
@@ -328,7 +320,8 @@ public class BubbleTransport : Transport
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
 
-        serverMessageBuffer.Add(new ServerMessage(new ArraySegment<byte>(_data, offset, count), connId));
+        serverMessageBuffer.Add(new ArraySegment<byte>(_data, offset, count));
+        serverMessageBufferConnIds.Add(connId);
     }
 
     /// <summary>
@@ -389,8 +382,9 @@ public class BubbleTransport : Transport
         //This executes any messages that were recieved in the last frame
         for (int i = 0; i < serverMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
-            OnServerDataReceived?.Invoke(serverMessageBuffer[0].connId, serverMessageBuffer[0].message, 0);
+            OnServerDataReceived?.Invoke(serverMessageBufferConnIds[0], serverMessageBuffer[0], 0);
             serverMessageBuffer.RemoveAt(0);
+            serverMessageBufferConnIds.RemoveAt(0);
         }
     }
     private void Start()
