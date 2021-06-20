@@ -216,7 +216,7 @@ public class BubbleTransport : Transport
         _Shutdown();
     }
 
-    public override void ClientSend(int channelId, ArraySegment<byte> segment)
+    public override void ClientSend(ArraySegment<byte> segment,int channelId)
     {
         if (!connected || segment.Count > GetMaxPacketSize(channelId)) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
@@ -279,13 +279,12 @@ public class BubbleTransport : Transport
         return connected && Mirror.NetworkServer.active;
     }
 
-    public override bool ServerDisconnect(int connectionId)
+    public override void ServerDisconnect(int connectionId)
     {
         //Game center matchmaking does not support kicking a client, you may want to create your own functionallity for telling a client to disconnect
-        return false;
     }
 
-    public override void ServerSend(int connectionId, int channelId, ArraySegment<byte> segment)
+    public override void ServerSend(int connectionId, ArraySegment<byte> segment, int channelId)
     {
         if (!connected || segment.Count > GetMaxPacketSize(channelId)) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
