@@ -8,8 +8,6 @@
 # Bubble Transport
 Bubble transport is a transport for [Mirror Networking](https://github.com/vis2k/Mirror) that uses [Game Center Matchmaking](https://developer.apple.com/game-center/) to connect players and transfer data.
 
-Bubble is **fully functional**, although I still need to spend some more time optimising it, cleaning up code and adding comments :D
-
 ## Info
 Bubble does not work in the same way as normal Mirror transports in the sense that you cannot choose to be a client or a server due to the random nature of matchmaking.
 
