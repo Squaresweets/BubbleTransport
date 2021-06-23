@@ -127,6 +127,7 @@ public class BubbleTransport : Transport
     /// </summary>
     public void FindMatch()
     {
+        if (!Available()) return;
         if (Mirror.NetworkManager.singleton.maxConnections > 4)
         {
             Debug.LogError("Real time Game Center Matches support a max of 4 players");
@@ -140,7 +141,7 @@ public class BubbleTransport : Transport
     public override bool Available()
     {
 #if UNITY_IOS
-        return Application.platform == RuntimePlatform.IPhonePlayer && available && new System.Version(Device.systemVersion) >= new System.Version("13.0");
+        return available && new System.Version(Device.systemVersion) >= new System.Version("13.0");
 #else
         return false;
 #endif
@@ -168,6 +169,7 @@ public class BubbleTransport : Transport
     [AOT.MonoPInvokeCallback(typeof(OnInviteRecievedDelegate))]
     static void OnInviteRecieved()
     {
+        if (!instance.Available()) return;
         //An invite has been recieved, we shutdown the network and then call FindMatch
         if (NetworkManager.singleton.isNetworkActive)
         {
