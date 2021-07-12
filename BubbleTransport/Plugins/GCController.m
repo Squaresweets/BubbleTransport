@@ -6,9 +6,9 @@
 
 extern UIViewController *UnityGetGLViewController();
 
-typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count);
+typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
 OnClientDidDataRecievedDelegate ClientRecievedData = NULL;
-typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count);
+typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
 OnServerDidDataRecievedDelegate ServerRecievedData = NULL;
 typedef void (*OnServerConnectedDelegate)(int connId);
 OnServerConnectedDelegate ServerConnected = NULL;
@@ -122,17 +122,20 @@ static BOOL* isServer = NULL;
     
     Byte offset;
     [data getBytes:&offset length:1];
+    Byte channelId;
+    [data getBytes:&channelId range:NSMakeRange(1,1)];
+    NSLog(@"%d", (int)channelId);
     
     Byte byteData[len-1];
-    [data getBytes:byteData range:NSMakeRange(1,len-1)];
+    [data getBytes:byteData range:NSMakeRange(2,len-2)];
     intptr_t i = byteData;
     if(isServer)
     {
-        ServerRecievedData([self getConnID:player], i, (int)offset, (int)len-1);
+        ServerRecievedData([self getConnID:player], i, (int)offset, (int)len-2, (int)channelId);
     }
     else
     {
-        ClientRecievedData(i, (int)offset, (int)len-1);
+        ClientRecievedData(i, (int)offset, (int)len-2, (int)channelId);
     }
 }
 
@@ -157,23 +160,25 @@ extern "C"
     }
     void SendMessageToServer(Byte data[], int offset, int count, int channel)
     {
-        Byte dataoffset[(NSUInteger)count+1];
+        Byte dataoffset[(NSUInteger)count+2];
         dataoffset[0] = (Byte)offset;
-        memcpy(dataoffset+1, data, count);
-        NSData *dataToSend = [NSData dataWithBytes:dataoffset length:count+1];
+        dataoffset[1] = (Byte)channel;
+        memcpy(dataoffset+2, data, count);
+        NSData *dataToSend = [NSData dataWithBytes:dataoffset length:count+2];
         
         [GCController sendDataToServer:dataToSend datamode:channel];
     }
     void SendMessageToClient(int clientId, Byte data[], int offset, int count, int channel)
     {
-        Byte dataoffset[(NSUInteger)count+1];
+        Byte dataoffset[(NSUInteger)count+2];
         dataoffset[0] = (Byte)offset;
-        memcpy(dataoffset+1, data, count);
-        NSData *dataToSend = [NSData dataWithBytes:dataoffset length:count+1];
+        dataoffset[1] = (Byte)channel;
+        memcpy(dataoffset+2, data, count);
+        NSData *dataToSend = [NSData dataWithBytes:dataoffset length:count+2];
         
         [GCController sendDataToPlayer:dataToSend toPlayer:clientId datamode:channel];
     }
-    typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count);
+    typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
     void RegisterClientDataRecieveCallback(OnClientDidDataRecievedDelegate callback)
     {
         if(ClientRecievedData == NULL)
@@ -229,7 +234,7 @@ extern "C"
             ClientDisconnected = callback;
         }
     }
-    typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count);
+    typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
     void RegisterServerDataRecieveCallback(OnServerDidDataRecievedDelegate callback)
     {
         if(ServerRecievedData == NULL)

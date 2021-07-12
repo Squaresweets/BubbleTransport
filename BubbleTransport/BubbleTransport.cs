@@ -57,7 +57,7 @@ public class BubbleTransport : Transport
 
     [DllImport("__Internal")]
     private static extern void RegisterInviteRecieveCallback(OnInviteRecievedDelegate InviteRecieved);
-#endregion
+    #endregion
 
     public int MinPlayers = 2;
     public int MaxReceivesPerTick = 1000;
@@ -75,11 +75,21 @@ public class BubbleTransport : Transport
     [SerializeField]
     private MatchFoundEvent inviteRecieved = new MatchFoundEvent();
 
-    static List<ArraySegment<Byte>> clientMessageBuffer = new List<ArraySegment<byte>>();
+    static List<MessageBuffer> clientMessageBuffer = new List<MessageBuffer>();
+    static List<MessageBuffer> serverMessageBuffer = new List<MessageBuffer>();
+    struct MessageBuffer
+    {
+        public ArraySegment<byte> data;
+        public int channelId;
+        public int connId;
 
-    //Done this way as structs seem to be pretty slow
-    static List<ArraySegment<Byte>> serverMessageBuffer = new List<ArraySegment<byte>>();
-    static List<int> serverMessageBufferConnIds = new List<int>();
+        public MessageBuffer(ArraySegment<byte> data, int channelId, int connId)
+        {
+            this.data = data;
+            this.channelId = channelId;
+            this.connId = connId;
+        }
+    }
 
 
     bool available = true;
@@ -137,7 +147,7 @@ public class BubbleTransport : Transport
     }
 
 
-#region Misc
+    #region Misc
     public override bool Available()
     {
 #if UNITY_IOS
@@ -155,11 +165,11 @@ public class BubbleTransport : Transport
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     //Sizes from: https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/GameKit_Guide/Matchmaking/Matchmaking.html
-    public override int GetMaxPacketSize(int channelId = 0) { return channelId == 0 ? 89088 : 1000;  }
+    public override int GetMaxPacketSize(int channelId = 0) { return channelId == 0 ? 89088 : 1000; }
 
     public override void Shutdown()
     {
-        if(Available())
+        if (Available())
         {
             _Shutdown();
             connected = false;
@@ -180,7 +190,7 @@ public class BubbleTransport : Transport
                 NetworkManager.singleton.StopClient();
             return;
         }
-        else if(instance.InviteRecievedScene != null && instance.InviteRecievedScene != SceneManager.GetActiveScene().path)
+        else if (instance.InviteRecievedScene != null && instance.InviteRecievedScene != SceneManager.GetActiveScene().path)
         {
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.LoadScene(instance.InviteRecievedScene);
@@ -196,9 +206,9 @@ public class BubbleTransport : Transport
         SceneManager.sceneLoaded -= OnSceneLoaded;
         OnInviteRecieved();
     }
-#endregion
+    #endregion
 
-#region Client
+    #region Client
     public override bool ClientConnected()
     {
         return connected && !Mirror.NetworkServer.active;
@@ -210,7 +220,7 @@ public class BubbleTransport : Transport
         _Shutdown();
     }
 
-    public override void ClientSend(ArraySegment<byte> segment,int channelId)
+    public override void ClientSend(ArraySegment<byte> segment, int channelId)
     {
         if (!connected || segment.Count > GetMaxPacketSize(channelId)) return;
         if (channelId > 1) { Debug.LogError("Only channels 0 and 1 are supported"); return; }
@@ -230,9 +240,9 @@ public class BubbleTransport : Transport
         instance.needToDisconnectFlag = true;
     }
 
-    delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count);
+    delegate void OnClientDidDataRecievedDelegate(IntPtr data, int offset, int count, int channelId);
     [AOT.MonoPInvokeCallback(typeof(OnClientDidDataRecievedDelegate))]
-    static void OnClientDidDataRecieved(IntPtr data, int offset, int count)
+    static void OnClientDidDataRecieved(IntPtr data, int offset, int count, int channelId)
     {
         if (!instance.connected)
             return;
@@ -240,19 +250,19 @@ public class BubbleTransport : Transport
         We get a pointer back from the plugin containing the location of the array of bytes
         Data recieved is formatted like this:
 
-        -----------------------------------------------------
-        |        |                                          |
-        | offset |     Byte Array containing all data...    |
-        | 1 Byte |     Rest of the array                    |
-        |        |                                          |
-        -----------------------------------------------------
+        ---------------------------------------------------------------
+        |        |         |                                          |
+        | offset | channel |     Byte Array containing all data...    |
+        | 1 Byte | 1 Byte  |     Rest of the array                    |
+        |        |         |                                          |
+        ---------------------------------------------------------------
 
         Objective C code splits this up into offset and count and sends it here
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
 
-        clientMessageBuffer.Add(new ArraySegment<byte>(_data, offset, count));
+        clientMessageBuffer.Add(new MessageBuffer(new ArraySegment<byte>(_data, offset, count), channelId, 0));
     }
 
     delegate void OnClientStartDelegate();
@@ -265,9 +275,9 @@ public class BubbleTransport : Transport
         NetworkManager.singleton.StartClient();
         instance.OnClientConnected?.Invoke();
     }
-#endregion
+    #endregion
 
-#region Server
+    #region Server
     public override bool ServerActive()
     {
         return connected && Mirror.NetworkServer.active;
@@ -300,30 +310,29 @@ public class BubbleTransport : Transport
         instance.OnServerDisconnected?.Invoke(connID);
     }
 
-    delegate void OnServerDidDataRecievedDelegate(int connId, IntPtr data, int offset, int count);
+    delegate void OnServerDidDataRecievedDelegate(int connId, IntPtr data, int offset, int count, int channelId);
     [AOT.MonoPInvokeCallback(typeof(OnServerDidDataRecievedDelegate))]
-    static void OnServerDidDataRecieved(int connId, IntPtr data, int offset, int count)
+    static void OnServerDidDataRecieved(int connId, IntPtr data, int offset, int count, int channelId)
     {
         if (!instance.connected)
             return;
         /*
         We get a pointer back from the plugin containing the location of the array of bytes
         Data recieved is formatted like this:
-
-        -----------------------------------------------------
-        |        |                                          |
-        | offset |     Byte Array containing all data...    |
-        | 1 Byte |     Rest of the array                    |
-        |        |                                          |
-        -----------------------------------------------------
+        
+        ---------------------------------------------------------------
+        |        |         |                                          |
+        | offset | channel |     Byte Array containing all data...    |
+        | 1 Byte | 1 Byte  |     Rest of the array                    |
+        |        |         |                                          |
+        ---------------------------------------------------------------
 
         Objective C code splits this up into offset and count and sends it here
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
 
-        serverMessageBuffer.Add(new ArraySegment<byte>(_data, offset, count));
-        serverMessageBufferConnIds.Add(connId);
+        clientMessageBuffer.Add(new MessageBuffer(new ArraySegment<byte>(_data, offset, count), channelId, connId));
     }
 
     /// <summary>
@@ -364,7 +373,7 @@ public class BubbleTransport : Transport
     public override void ClientLateUpdate()
     {
         if (instance != this || !enabled) return;
-        if(needToDisconnectFlag)
+        if (needToDisconnectFlag)
         {
             OnClientDisconnected?.Invoke();
             needToDisconnectFlag = false;
@@ -373,7 +382,9 @@ public class BubbleTransport : Transport
         //This executes any messages that were recieved in the last frame
         for (int i = 0; i < clientMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
-            OnClientDataReceived?.Invoke(clientMessageBuffer[0], 0);
+            //Channel set as 0 because I can't work out the channel from the message
+            //I may want to add something that sends the channel as well later
+            OnClientDataReceived?.Invoke(clientMessageBuffer[0].data, clientMessageBuffer[0].channelId);
             clientMessageBuffer.RemoveAt(0);
         }
     }
@@ -384,15 +395,16 @@ public class BubbleTransport : Transport
         //This executes any messages that were recieved in the last frame
         for (int i = 0; i < serverMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
-            OnServerDataReceived?.Invoke(serverMessageBufferConnIds[0], serverMessageBuffer[0], 0);
+            //Channel set as 0 because I can't work out the channel from the message
+            //I may want to add something that sends the channel as well later
+            OnServerDataReceived?.Invoke(serverMessageBuffer[0].connId, serverMessageBuffer[0].data, serverMessageBuffer[0].channelId);
             serverMessageBuffer.RemoveAt(0);
-            serverMessageBufferConnIds.RemoveAt(0);
         }
     }
     private void Start()
     {
         //Done on start so we only accept an invite when when the scene has fully finished loading
-        if(Available())
+        if (Available())
             _InitGameCenter();
     }
     private void Awake()
