@@ -97,6 +97,8 @@ public class BubbleTransport : Transport
     bool connected = false;
 
     bool needToDisconnectFlag = false;
+    //Check if it was the transport that started the game
+    static bool startFlag = false;
 
     /* Structure of the transport
     
@@ -159,8 +161,20 @@ public class BubbleTransport : Transport
 
     //~~~~~~~~~~ These two functions are all sorted out by game center, and these should not be called by anything other than the transport, if you want to start a game use FindMatch(); ~~~~~~~~~~
 
-    public override void ServerStart() { }
-    public override void ClientConnect(string address) { }
+    public override void ServerStart()
+    {
+        if (startFlag)
+            startFlag = false;
+        else
+            Debug.LogError("BubbleTransport | Don't call ServerStart() as matchmaking is random, call FindMatch() instead :D");
+    }
+    public override void ClientConnect(string address)
+    {
+        if (startFlag)
+            startFlag = false;
+        else
+            Debug.LogError("BubbleTransport | Don't call ClientConnect() as matchmaking is random, call FindMatch() instead :D");
+    }
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -256,8 +270,8 @@ public class BubbleTransport : Transport
         | 1 Byte | 1 Byte  |     Rest of the array                    |
         |        |         |                                          |
         ---------------------------------------------------------------
-
-        Objective C code splits this up into offset and count and sends it here
+        
+        Objective C code splits this up into offset and channel and sends it here
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
@@ -272,6 +286,7 @@ public class BubbleTransport : Transport
         instance.connected = true;
         activeTransport = instance;
         instance.matchFound.Invoke();
+        startFlag = true;
         NetworkManager.singleton.StartClient();
         instance.OnClientConnected?.Invoke();
     }
@@ -327,12 +342,12 @@ public class BubbleTransport : Transport
         |        |         |                                          |
         ---------------------------------------------------------------
 
-        Objective C code splits this up into offset and count and sends it here
+        Objective C code splits this up into offset and channel and sends it here
         */
         byte[] _data = new byte[count];
         Marshal.Copy(data, _data, 0, count);
 
-        clientMessageBuffer.Add(new MessageBuffer(new ArraySegment<byte>(_data, offset, count), channelId, connId));
+        serverMessageBuffer.Add(new MessageBuffer(new ArraySegment<byte>(_data, offset, count), channelId, connId));
     }
 
     /// <summary>
@@ -352,6 +367,7 @@ public class BubbleTransport : Transport
         instance.connected = true;
         activeTransport = instance;
         instance.matchFound?.Invoke();
+        startFlag = true;
         Mirror.NetworkManager.singleton.StartHost();
     }
 
@@ -382,8 +398,6 @@ public class BubbleTransport : Transport
         //This executes any messages that were recieved in the last frame
         for (int i = 0; i < clientMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
-            //Channel set as 0 because I can't work out the channel from the message
-            //I may want to add something that sends the channel as well later
             OnClientDataReceived?.Invoke(clientMessageBuffer[0].data, clientMessageBuffer[0].channelId);
             clientMessageBuffer.RemoveAt(0);
         }
@@ -395,8 +409,6 @@ public class BubbleTransport : Transport
         //This executes any messages that were recieved in the last frame
         for (int i = 0; i < serverMessageBuffer.Count && i < MaxReceivesPerTick; i++)
         {
-            //Channel set as 0 because I can't work out the channel from the message
-            //I may want to add something that sends the channel as well later
             OnServerDataReceived?.Invoke(serverMessageBuffer[0].connId, serverMessageBuffer[0].data, serverMessageBuffer[0].channelId);
             serverMessageBuffer.RemoveAt(0);
         }

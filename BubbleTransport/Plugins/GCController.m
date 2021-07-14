@@ -6,9 +6,9 @@
 
 extern UIViewController *UnityGetGLViewController();
 
-typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
+typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count, uint32_t channelId);
 OnClientDidDataRecievedDelegate ClientRecievedData = NULL;
-typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
+typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count, uint32_t channelId);
 OnServerDidDataRecievedDelegate ServerRecievedData = NULL;
 typedef void (*OnServerConnectedDelegate)(int connId);
 OnServerConnectedDelegate ServerConnected = NULL;
@@ -178,7 +178,7 @@ extern "C"
         
         [GCController sendDataToPlayer:dataToSend toPlayer:clientId datamode:channel];
     }
-    typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
+    typedef void (*OnClientDidDataRecievedDelegate)(intptr_t data, uint32_t offset, uint32_t count, uint32_t channelId);
     void RegisterClientDataRecieveCallback(OnClientDidDataRecievedDelegate callback)
     {
         if(ClientRecievedData == NULL)
@@ -234,7 +234,7 @@ extern "C"
             ClientDisconnected = callback;
         }
     }
-    typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count, uint32_t ChannelId);
+    typedef void (*OnServerDidDataRecievedDelegate)(int connId, intptr_t data, uint32_t offset, uint32_t count, uint32_t channelId);
     void RegisterServerDataRecieveCallback(OnServerDidDataRecievedDelegate callback)
     {
         if(ServerRecievedData == NULL)
